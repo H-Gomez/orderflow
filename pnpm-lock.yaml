@@ -176,6 +176,28 @@ importers:
         specifier: 2.10.13
         version: 2.10.13
 
+  .claude/hooks:
+    dependencies:
+      prettier:
+        specifier: 3.9.6
+        version: 3.9.6
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+    devDependencies:
+      '@orderflow/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: 24.13.4
+        version: 24.13.4
+      eslint:
+        specifier: 10.10.0
+        version: 10.10.0
+      vitest:
+        specifier: 5.0.1
+        version: 5.0.1(@types/node@24.13.4)(vite@8.3.0(@types/node@24.13.4))
+
   packages/config:
     dependencies:
       '@eslint/js':
