@@ -1,0 +1,28 @@
+{
+  "name": "@orderflow/smoke",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@orderflow/config": "workspace:*",
+    "@types/node": "24.13.4",
+    "eslint": "10.10.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

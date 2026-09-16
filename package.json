@@ -1,0 +1,23 @@
+{
+  "name": "orderflow",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=24.21.0 <25",
+    "pnpm": ">=12.4.2 <13"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@orderflow/config": "workspace:*",
+    "prettier": "3.9.6",
+    "turbo": "2.10.13"
+  }
+}
