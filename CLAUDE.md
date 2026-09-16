@@ -19,7 +19,7 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 ## Invariants (non-negotiable)
 
 - **Ledger:** never update or delete a ledger entry. The ledger is append-only, and a correction is a new entry.
-  The whole ledger sums to zero.. Details: [docs/domain/ledger.md](docs/domain/ledger.md).
+  Every transaction's entries sum to zero per currency, so the ledger does too. Details: [docs/domain/ledger.md](docs/domain/ledger.md).
 - Balances should not be stored, for example no column in DB. Instead they are computed.
 - Read [docs/domain/](docs/domain/) before implementing domain behaviour. Settlement rules live in
   [docs/domain/settlement.md](docs/domain/settlement.md), matching rules in [matching.md](docs/domain/matching.md),
@@ -32,7 +32,7 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 - Only touch the files listed in the story's "Touchable files". Anything else is out of scope.
 - Never commit secrets or `.env` files.
 - Destructive operations are forbidden such as `pulumi destroy`, `DROP TABLE`, queue purges. If you need these to be run please ask for approval.
-- Money values should never be of type FLOAT.
+- - Money is never binary floating point: no JS `number`, Prisma `Float`, or Postgres `real`/`double precision` for amounts. Representation: STORY-003.
 - Every consumer is idempotent on event ID
 - The engine publishes only via the outbox
 - The assistant never states a number it didn't get from a tool
