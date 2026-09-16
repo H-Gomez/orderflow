@@ -60,5 +60,6 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 - A story is a GitHub issue labelled `story`, with Context, Contract, Invariants, Out of scope, Verification
   and Touchable files. Agents only pick up issues labelled `agent-ready`.
 - The PR body starts with `Closes #<issue>`.
+- Run a story with `/ship start <issue>` and `/ship finish` ([.claude/skills/ship/SKILL.md](.claude/skills/ship/SKILL.md)).
 - Agents open PRs. They never merge, approve, push to `main` or force-push.
 - If the spec is ambiguous or conflicts with this file, stop and ask on the issue. Don't guess.
