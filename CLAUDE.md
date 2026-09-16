@@ -1,6 +1,6 @@
 # OrderFlow
 
-OrderFlow is a crypto paper-trading exchange with virtual money and no custody. Orders are matched and settled, and the resulting money movements are recorded in a ledger.
+OrderFlow is a crypto paper-trading exchange. Users sign up, get seeded virtual USD, and trade 5 to 8 pairs (BTC-USD, ETH-USD, SOL-USD, ...) against a real order-matching engine we build. The UI shows a live order book, candles, portfolio P&L, and the signature feature: two prices per instrument, the external index price (computed from real Binance/Coinbase/Kraken feeds) and this venue's last-traded price (emerging from your own book). A fleet of bot accounts keeps the market alive and tethered to the index. A Desk Analyst assistant answers questions over the user's own data, grounded in the database through tool calls, with a published eval scorecard.
 It serves this through a NestJS API and a Desk Analyst LLM assistant that answers questions from the data and these docs.
 It is a pnpm + Turborepo monorepo. Architecture: [docs/architecture.md](docs/architecture.md).
 
