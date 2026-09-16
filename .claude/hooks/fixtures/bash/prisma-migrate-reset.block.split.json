@@ -1,0 +1,10 @@
+{
+  "session_id": "fixture",
+  "cwd": "/repo",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "DATABASE_URL=postgresql://app:pw@localhost:5432/orderflow true; pnpm prisma migrate reset --force",
+    "description": "fixture"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "session_id": "fixture",
+  "cwd": "/repo",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "psql -c \"DR''OP /* x */ TABLE ledger_entries\"",
+    "description": "fixture"
+  }
+}
