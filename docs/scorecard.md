@@ -13,8 +13,8 @@ Filled by hand. Log a row when a PR merges or closes. Fill the weekly summary at
 - **Spec-debt PRs:** doc fixes this story triggered.
 - **Notes:** one line. Add bug links here if a defect later traces to this story.
 
-| Story | PR | Spec'd | Closed | Author | Plan edits | Review rounds | Restarts | Outcome | Spec-debt PRs | Notes |
-| ----- | -- | ------ | ------ | ------ | ---------- | ------------- | -------- | ------- | ------------- | ----- |
+| Story | PR  | Spec'd | Closed | Author | Plan edits | Review rounds | Restarts | Outcome | Spec-debt PRs | Notes |
+| ----- | --- | ------ | ------ | ------ | ---------- | ------------- | -------- | ------- | ------------- | ----- |
 
 ## Weekly summary
 
