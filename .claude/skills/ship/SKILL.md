@@ -27,6 +27,16 @@ When a step says **stop**, report what failed and why, leave the PR as it is (st
 - Put `<placeholders>` and `@handles` in backticks, so GitHub doesn't swallow them as HTML or turn them into mentions.
 - Pass text to `gh` and `git` as files (`--body-file`, `git commit -F`). The Bash guard blocks any command whose text mentions a denied phrase, even inside a PR body.
 
+## Labels and ready state
+
+`gh pr ready`, `gh pr edit --add-label` and `gh issue edit --add-label` run a GraphQL query needing the `read:org` scope, which an agent token doesn't have. Use the REST and GraphQL calls instead, with `<repo>` as `<owner>/<name>`:
+
+- Add a label: `gh api repos/<repo>/issues/<number>/labels -f "labels[]=<label>"`
+- Remove a label: `gh api -X DELETE repos/<repo>/issues/<number>/labels/<label>`
+- Mark a PR ready: take `node_id` from `gh api repos/<repo>/pulls/<number>`, then `gh api graphql -f query='mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{isDraft}}}' -f id="<node_id>"`
+
+A PR's labels live on its issue number, so the label calls above work for both.
+
 ## Mode: `start <issue> [--base <branch>]`
 
 `<base>` is the `--base` value, or `main` if none was given.
@@ -35,13 +45,13 @@ When a step says **stop**, report what failed and why, leave the PR as it is (st
    - `gh issue view <issue> --json state,labels,title,body`: the issue is open and labelled both `story` and `agent-ready`.
    - `git status --porcelain` is empty.
    - `git fetch origin` succeeds, and `origin/<base>` exists.
-2. **Claim the issue:** `gh issue edit <issue> --add-assignee @me --add-label in-progress`.
+2. **Claim the issue:** `gh issue edit <issue> --add-assignee @me`, then add the label the API way (see "Labels and ready state").
 3. **Branch name:** `story-<id>-<slug>`.
    - `<id>` comes from a title starting `STORY-<id>`, lowercased (`STORY-001d: …` → `001d`). If the title has no such prefix, use the issue number.
    - `<slug>` is 2–4 lowercase, hyphenated words from the rest of the title, without filler words like "and", "the" or "for".
 4. **Create or confirm the branch.**
    - If a branch matching `story-<id>-*` already exists locally or on `origin`, switch to it and say which one you're using.
-   - Otherwise: `git switch -c <branch> origin/<base>`.
+   - Otherwise: `git switch --no-track -c <branch> origin/<base>` (that flag order; `-c --no-track` is rejected). Without `--no-track` the branch tracks the base branch, and `finish`'s pushed-state check then compares against the wrong ref.
 5. **Empty commit.** Only if `git rev-list --count origin/<base>..HEAD` is `0`: `git commit --allow-empty -F <file>`. The message is `chore: start STORY-<id>` plus any commit trailer this session requires.
 6. **Push:** `git push -u origin <branch>`.
 7. **Draft PR.** If `gh pr view <branch>` finds a PR, reuse it. Otherwise:
@@ -85,8 +95,5 @@ When a step says **stop**, report what failed and why, leave the PR as it is (st
    - Under `## Evidence`, add or update a "Checks" entry (the commit SHA, then each command with its exit code and output tail) and a "Scope" entry (the changed files, each with the Touchable entry it matched).
    - Then, for each `- [ ]` item under `## Verification`, tick it (`- [x]`) only if the PR body or a PR comment holds evidence for that exact item: command output, a link, or a pasted transcript. Items only a human can run stay unticked.
    - Write the body back with `gh pr edit <number> --body-file <file>`.
-8. **Ready.**
-   - `gh pr ready <number>`
-   - `gh issue edit <n> --remove-label in-progress`
-   - `gh pr edit <number> --add-label agent-authored`
+8. **Ready.** All three go through the API (see "Labels and ready state"): mark the PR ready, remove `in-progress` from the issue, add `agent-authored` to the PR.
 9. **Report:** the PR URL, the check results, the scope result, and which checklist items are ticked and which still need a human.
