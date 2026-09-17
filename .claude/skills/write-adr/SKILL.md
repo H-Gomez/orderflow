@@ -1,6 +1,6 @@
 ---
 name: write-adr
-description: Draft an OrderFlow Architecture Decision Record from a GitHub issue or the current discussion. Copies docs/adr/0000-template.md to docs/adr/NNNN-<slug>.md with Status Proposed, and adds or updates its row in the docs/adr/README.md index. Use when asked to write, draft or propose an ADR.
+description: Draft an OrderFlow Architecture Decision Record from a GitHub issue or the current discussion. Copies docs/adr/0000-template.md to docs/adr/NNN-<slug>.md (three digits) with Status Proposed, and adds or updates its row in the docs/adr/README.md index. Use when asked to write, draft or propose an ADR.
 argument-hint: "[issue-number]"
 ---
 
@@ -23,14 +23,14 @@ Arguments: `$ARGUMENTS` (an issue number, or empty to draft from the current dis
    - Otherwise use the current discussion. If the discussion names no decision to record, ask what the ADR should decide and stop.
 2. **Read** `docs/adr/0000-template.md`, `docs/adr/README.md`, and the list of files in `docs/adr/`.
 3. **Number.**
-   - Numbers 001 to 008 are reserved, whether or not they have an issue or a row yet.
-   - **If the index already has a row for this issue:** use that row's number.
-     - If the row's status is `Not yet written`, write the file.
-     - If a file already exists for that number, stop and report it. Never overwrite an ADR.
-   - **Otherwise:** use the lowest number ≥ 009 that has no row in the index and no `NNNN-*.md` file.
-4. **File name:** `docs/adr/NNNN-<slug>.md`. `NNNN` is the number zero-padded to four digits. `<slug>` is 2–5 lowercase, hyphenated words from the decision's title.
+   - **If the issue or discussion names an ADR number** (e.g. "ADR-008"; issue #21 is ADR-008), use it.
+   - **Otherwise:** use the lowest number ≥ 009 that has no row in the index and no `NNN-*.md` file. Numbers 001 to 008 are reserved, whether or not they have a row yet.
+   - **If a file for that number already exists,** stop and report it. Never overwrite an ADR.
+4. **File name:** `docs/adr/NNN-<slug>.md`, where:
+   - `NNN` is the number zero-padded to three digits.
+   - `<slug>` is 2–5 lowercase, hyphenated words from the decision's title.
 5. **Write the file.** Copy the template exactly, keeping every heading in order, and fill it in:
-   - **Title line:** `# ADR-NNNN: <Title>`.
+   - **Title line:** `# ADR-NNN: <Title>`.
    - **Status:** `Proposed`.
    - **Date:** today, from `date +%F`.
    - **Issue:** `#<n>`, or `TBD` when drafting from a discussion.
@@ -40,7 +40,7 @@ Arguments: `$ARGUMENTS` (an issue number, or empty to draft from the current dis
    - **Consequences:** what the source says becomes easier, harder, or must stay true. Otherwise `TBD`.
    - Replace the template's guidance sentences. Don't leave them in.
 6. **Update the index** in `docs/adr/README.md`.
-   - If the number already has a row, set Title to `[<Title>](NNNN-<slug>.md)` and Status to `Proposed`.
+   - If the number already has a row (e.g. 008, `Not yet written`), set only that row's Title to `[<Title>](NNN-<slug>.md)` and its Status to `Proposed`.
    - Otherwise add a row in numeric order: three-digit number, linked title, `Proposed`, and `#<n>` (or `TBD`).
    - Keep the table's existing format.
 7. **Report:** the file path, the index row, and every field left as `TBD`, so the author can fill it in.
