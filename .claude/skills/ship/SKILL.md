@@ -29,7 +29,9 @@ When a step says **stop**, report what failed and why, leave the PR as it is (st
 
 ## Labels and ready state
 
-`gh pr ready`, `gh pr edit --add-label` and `gh issue edit --add-label` run a GraphQL query needing the `read:org` scope, which an agent token doesn't have. Use the REST and GraphQL calls instead, with `<repo>` as `<owner>/<name>`:
+`gh pr ready`, `gh pr edit` (including `--body-file`) and `gh issue edit --add-label` run a GraphQL query needing the `read:org` scope, which an agent token doesn't have. Use the REST and GraphQL calls instead, with `<repo>` as `<owner>/<name>`:
+
+- Edit a PR body: `gh api -X PATCH repos/<repo>/pulls/<number> -F body=@<file>`
 
 - Add a label: `gh api repos/<repo>/issues/<number>/labels -f "labels[]=<label>"`
 - Remove a label: `gh api -X DELETE repos/<repo>/issues/<number>/labels/<label>`
@@ -94,6 +96,6 @@ A PR's labels live on its issue number, so the label calls above work for both.
 7. **Evidence and ticks.**
    - Under `## Evidence`, add or update a "Checks" entry (the commit SHA, then each command with its exit code and output tail) and a "Scope" entry (the changed files, each with the Touchable entry it matched).
    - Then, for each `- [ ]` item under `## Verification`, tick it (`- [x]`) only if the PR body or a PR comment holds evidence for that exact item: command output, a link, or a pasted transcript. Items only a human can run stay unticked.
-   - Write the body back with `gh pr edit <number> --body-file <file>`.
+   - Write the body back the API way (see "Labels and ready state").
 8. **Ready.** All three go through the API (see "Labels and ready state"): mark the PR ready, remove `in-progress` from the issue, add `agent-authored` to the PR.
 9. **Report:** the PR URL, the check results, the scope result, and which checklist items are ticked and which still need a human.
