@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-One file per decision: `NNNN-short-title.md`, copied from [0000-template.md](0000-template.md).
+One file per decision: `NNN-short-title.md`, copied from [0000-template.md](0000-template.md).
 An ADR's status is Proposed, Accepted or Superseded. Nothing counts as decided until its ADR is Accepted.
 
 ## Index
