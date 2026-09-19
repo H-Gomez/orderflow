@@ -78,13 +78,14 @@ A PR's labels live on its issue number, so the label calls above work for both.
    - Stop if `git status --porcelain` is not empty.
    - `git fetch origin`. Stop if `git rev-parse HEAD` differs from `git rev-parse @{u}`. The evidence must describe the pushed code.
 3. **Changed files:** `git diff --name-only origin/<base>...HEAD`.
-4. **File types.** Stop with "language not supported yet (Python support arrives with STORY-023)", naming the file, if any changed file is something other than:
+4. **File types.** Stop, naming the file, if any changed file is something other than the list below. For a source file in a language this repo doesn't support yet, say "language not supported yet (Python support arrives with STORY-023)". Otherwise say why the file isn't allowed. These are filename rules, not path rules, so a directory such as `.github/` grants nothing on its own.
    - TypeScript: `.ts`, `.tsx`, `.mts`, `.cts`
    - Markdown: `.md`
    - Config:
      - `.json`, `.yaml`, `.yml`
      - `*.config.js`, `*.config.mjs`, `*.config.cjs`
      - repo dotfiles such as `.gitignore`, `.npmrc`, `.nvmrc`, `.prettierignore`
+   - GitHub metadata: the extensionless `CODEOWNERS`, in `.github/`, the repository root or `docs/` only, which are the three paths GitHub reads it from
 5. **Scope.**
    - Every changed file must match an entry in the issue's Touchable files. Entries are globs, with `**` matching any depth. Stop and list every file that matches none.
    - If the matching entry has a restriction in parentheses (e.g. "Workflow section only"), read `git diff origin/<base>...HEAD -- <file>` and confirm the change respects it. Stop if it doesn't, or if you can't tell.
