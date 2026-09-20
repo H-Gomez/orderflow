@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # /ship diffs against origin/<base>, so it needs full history.
           fetch-depth: 0
@@ -40,18 +40,22 @@ jobs:
         uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1.0.231
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: --max-turns 30
-          prompt: |
-            You are implementing an OrderFlow story in this repository.
-
-            Treat the body of the triggering issue as the story spec. Implement exactly what its Contract section states, respect every rule in its Invariants section, change only paths listed under Touchable files, and change nothing named under Out of scope.
-
-            Read CLAUDE.md before you start and obey every invariant in it, including the append-only ledger, computed balances, money never in binary floating point, strict TypeScript with no @ts-ignore, no default exports, and Vitest only. Read the documents the story's Context section links before implementing domain behaviour.
-
-            If the spec is ambiguous, conflicts with CLAUDE.md, or depends on a document that is missing or still a stub, stop and say so on the issue. Do not guess and do not invent domain rules.
-
-            Run the story's own Verification commands and paste their output in the pull request as evidence. Tick a Verification checklist item only when its evidence is in the pull request.
-
-            Follow the section 5.1 visibility protocol, and carry out the work through the /ship skill: /ship start for this issue, then /ship finish once the work is committed and pushed.
-
-            Never merge, never approve, never push to main, and never force-push. Open the pull request and leave it for a human.
+          # Without --allowedTools the action runs in automation mode with no
+          # shell and no GitHub access, so it can only produce text. /ship
+          # drives git and gh through Bash.
+          claude_args: >-
+            --max-turns 30
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
+          # The agent-ready label starts a story, and /ship is passed as a
+          # skill invocation because SKILL.md sets disable-model-invocation,
+          # so a prompt that merely mentions /ship cannot run it.
+          # An @claude comment is an ad-hoc request and does not start a story.
+          prompt: >-
+            ${{ github.event.label.name == 'agent-ready'
+            && format('/ship start {0}', github.event.issue.number)
+            || 'Answer the request in the comment that triggered this run.
+            Read CLAUDE.md first and obey every invariant in it.
+            Do not implement a story from a comment: story work begins when the
+            repository owner applies the agent-ready label, so that it goes
+            through /ship and produces a reviewable pull request.
+            Never merge, never approve, never push to main, never force-push.' }}
