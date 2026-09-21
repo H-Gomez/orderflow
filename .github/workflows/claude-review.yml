@@ -32,7 +32,7 @@ jobs:
           # These tools in allowedTools are read-only or grep, or for posting review comments but has no tool with which to approve.
           claude_args: >-
             --max-turns 40
-            --allowedTools "Read,Grep,Glob,Bash(gh issue view:*),Bash(gh pr diff:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment,mcp__github_comment__create_comment"
+            --allowedTools "Read,Grep,Glob,Bash(gh issue view:*),Bash(gh pr diff:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment,mcp__github_comment__update_claude_comment"
           prompt: |
             Review this pull request and post your findings as inline review comments on the diff.
 
@@ -43,6 +43,6 @@ jobs:
             3. Scope. Find the story issue the pull request body links with "Closes #<n>", read it, and check that every changed file matches an entry in that story's Touchable files and that nothing under its Out of scope section was touched.
             4. Missed edge cases, and behaviour in the Contract that no test covers.
 
-            Post one summary comment in the format in docs/conventions/agent-comments.md: line 1 a bold status word (ACTION NEEDED if anything blocks, otherwise FYI), line 2 what the human must do, at most 5 bullets, everything else folded in <details>. Each finding is one line: path:line, severity high/medium/low, problem. Put the detail in an inline comment on that line.
+            Write one summary with the update_claude_comment tool, in the format in docs/conventions/agent-comments.md: line 1 a bold status word (ACTION NEEDED if anything blocks, otherwise FYI), line 2 what the human must do, at most 5 bullets, everything else folded in <details>. Each finding is one line: path:line, severity high/medium/low, problem. Put the detail in an inline comment on that line.
 
             Never approve this pull request and never request changes as a formal review verdict. Comments only. A bot approval would satisfy the ruleset's review requirement and silently end human-only merge. Do not push commits, and do not edit any file.
