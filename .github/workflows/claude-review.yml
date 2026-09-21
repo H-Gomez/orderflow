@@ -34,7 +34,7 @@ jobs:
             --max-turns 40
             --allowedTools "Read,Grep,Glob,Bash(gh issue view:*),Bash(gh pr diff:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment,mcp__github_comment__update_claude_comment"
           prompt: |
-            Review this pull request and post your findings as inline review comments on the diff.
+            Review this pull request. Your one required output is a summary written with the update_claude_comment tool. Inline review comments are optional, for detail on a specific line only, and never a substitute for the summary.
 
             Check, in this order:
 
