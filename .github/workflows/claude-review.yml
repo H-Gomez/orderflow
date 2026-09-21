@@ -28,6 +28,14 @@ jobs:
         uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1.0.231
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Every pull request this pipeline produces is authored by the Claude
+          # GitHub App, and the action rejects bot actors by default, so without
+          # this the review never runs on the pull requests it exists to review.
+          # Named, not "*": on a public repo "*" would let any bot start a run.
+          # This job cannot loop: it has contents: read, it cannot push, and its
+          # only tool posts an inline comment, none of which is a pull_request
+          # event, so nothing it does can trigger another review.
+          allowed_bots: "claude"
           # Only the inline-comment tool is allowed, so this job can post
           # review comments but has no tool with which to approve.
           claude_args: >-
