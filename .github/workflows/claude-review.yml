@@ -46,4 +46,3 @@ jobs:
             Post one summary comment in the format in docs/conventions/agent-comments.md: line 1 a bold status word (ACTION NEEDED if anything blocks, otherwise FYI), line 2 what the human must do, at most 5 bullets, everything else folded in <details>. Each finding is one line: path:line, severity high/medium/low, problem. Put the detail in an inline comment on that line.
 
             Never approve this pull request and never request changes as a formal review verdict. Comments only. A bot approval would satisfy the ruleset's review requirement and silently end human-only merge. Do not push commits, and do not edit any file.
-            
