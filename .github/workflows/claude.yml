@@ -36,26 +36,72 @@ jobs:
           # /ship diffs against origin/<base>, so it needs full history.
           fetch-depth: 0
 
-      - name: Run Claude Code
+      # The agent-ready path is three steps, each its own action invocation
+      # with its own turn budget. A step that fails stops the ones after it,
+      # which is GitHub's default, so a broken run cannot reach finish and
+      # mark a pull request ready on evidence it does not have.
+      #
+      # /ship is passed as a skill invocation rather than described in prose.
+      # SKILL.md sets disable-model-invocation, so a model cannot invoke it
+      # from a prompt that merely mentions it, and that flag stays as it is.
+      #
+      # Without --allowedTools the action has no shell and no GitHub access
+      # and can only produce text. /ship drives git and gh through Bash.
+
+      - name: Start the story
+        if: github.event.label.name == 'agent-ready'
         uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1.0.231
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # Without --allowedTools the action runs in automation mode with no
-          # shell and no GitHub access, so it can only produce text. /ship
-          # drives git and gh through Bash.
           claude_args: >-
-            --max-turns 30
+            --max-turns 15
+            --allowedTools "Bash,Read,Glob,Grep"
+          prompt: /ship start ${{ github.event.issue.number }}
+
+      - name: Implement the story
+        if: github.event.label.name == 'agent-ready'
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1.0.231
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --max-turns 40
             --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
-          # The agent-ready label starts a story, and /ship is passed as a
-          # skill invocation because SKILL.md sets disable-model-invocation,
-          # so a prompt that merely mentions /ship cannot run it.
-          # An @claude comment is an ad-hoc request and does not start a story.
           prompt: >-
-            ${{ github.event.label.name == 'agent-ready'
-            && format('/ship start {0}', github.event.issue.number)
-            || 'Answer the request in the comment that triggered this run.
+            Implement the story in issue #${{ github.event.issue.number }} of this repository.
+            The previous step ran /ship start, so the story's branch is already checked out and its draft pull request is already open. Work on that branch.
+
+            Read the issue body and treat it as the spec. Implement exactly what its Contract section states, respect every rule in its Invariants section, change only paths listed under Touchable files, and change nothing named under Out of scope.
+
+            Read CLAUDE.md first and obey every invariant in it, including the append-only ledger, computed balances, money never in binary floating point, strict TypeScript with no @ts-ignore, no default exports, and Vitest only. Read the documents the story's Context section links before implementing domain behaviour.
+
+            If the spec is ambiguous, conflicts with CLAUDE.md, or depends on a document that is missing or still a stub, stop and say so in a comment on the issue rather than guessing. Never invent domain rules.
+
+            Commit your work with a Conventional Commits message and push it to the story's branch.
+
+            Never edit the issue's body, its title or its labels. Never merge, never approve, never push to main, and never force-push. Do not run /ship finish here: the next step does that.
+
+      - name: Finish the story
+        if: github.event.label.name == 'agent-ready'
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1.0.231
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --max-turns 25
+            --allowedTools "Bash,Read,Write,Glob,Grep"
+          prompt: /ship finish
+
+      # An @claude comment is an ad-hoc request. It never starts a story,
+      # so that story work always goes through /ship and the label.
+      - name: Answer an @claude comment
+        if: github.event.label.name != 'agent-ready'
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1.0.231
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --max-turns 20
+            --allowedTools "Bash,Read,Glob,Grep"
+          prompt: >-
+            Answer the request in the comment that triggered this run.
             Read CLAUDE.md first and obey every invariant in it.
-            Do not implement a story from a comment: story work begins when the
-            repository owner applies the agent-ready label, so that it goes
-            through /ship and produces a reviewable pull request.
-            Never merge, never approve, never push to main, never force-push.' }}
+            Do not implement a story from a comment: story work begins when the repository owner applies the agent-ready label, so that it goes through /ship and produces a reviewable pull request.
+            Never edit an issue's body, title or labels. Never merge, never approve, never push to main, never force-push.
