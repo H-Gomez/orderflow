@@ -24,9 +24,7 @@ jobs:
     # Owner only. A stranger typing @claude on this public repo must not spend
     # money, and orderflow-agent must not trigger a run either.
     if: >-
-      github.actor == 'H-Gomez' &&
-      (contains(github.event.comment.body, '@claude') ||
-      github.event.label.name == 'agent-ready')
+      github.actor == 'H-Gomez' && (contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -46,6 +44,7 @@ jobs:
           claude_args: >-
             --max-turns 30
             --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
+            --append-system-prompt "Every comment you post on an issue or PR follows docs/conventions/agent-comments.md. Read it first."
           # The agent-ready label starts a story, and /ship is passed as a
           # skill invocation because SKILL.md sets disable-model-invocation,
           # so a prompt that merely mentions /ship cannot run it.
