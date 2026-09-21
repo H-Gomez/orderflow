@@ -23,6 +23,10 @@ When a step says **stop**, report what failed and why, leave the PR as it is (st
 
 ## Writing PR bodies and comments
 
+- Every comment this skill posts, and the prose of every PR body, follows [docs/conventions/agent-comments.md](../../../docs/conventions/agent-comments.md): a bold status word on line 1, the one thing the human must do on line 2, at most 5 short bullets, everything else folded in `<details><summary>Full notes</summary> ... </details>`.
+- A PR body's structure is not prose: the `Closes #<issue>` first line, the `## Verification` checklist (content and position exactly as `start` wrote them) and `## Evidence` stay as this skill writes them.
+- Before posting a comment, run `pnpm --silent lint:comment < <file>`. If it fails, fix the comment and run it again. Never post one that fails.
+- Never put a secret, token, key or environment value in a comment or PR body, folded or not.
 - One line per paragraph or bullet. Never hard-wrap.
 - Put `<placeholders>` and `@handles` in backticks, so GitHub doesn't swallow them as HTML or turn them into mentions.
 - Pass text to `gh` and `git` as files (`--body-file`, `git commit -F`). The Bash guard blocks any command whose text mentions a denied phrase, even inside a PR body.
@@ -63,7 +67,16 @@ A PR's labels live on its issue number, so the label calls above work for both.
       - Then an empty `## Evidence` heading.
       - Then any PR footer this session requires.
    2. Run `gh pr create --draft --base <base> --head <branch> --title "<type>: <summary> (STORY-<id>)" --body-file <file>`. `<type>` is the Conventional Commit type that fits the story (`feat`, `docs`, `chore`, ...).
-8. **Comment on the issue:** `Branch: <branch in backticks> · Draft PR: <url>`, via `gh issue comment <issue> --body-file <file>`.
+8. **Comment on the issue** via `gh issue comment <issue> --body-file <file>`, in the comment format with status `FYI`:
+
+   ```markdown
+   **FYI**
+   Nothing.
+
+   - Branch: `<branch>`
+   - Draft PR: <url>
+   ```
+
 9. **Report:** the branch, base, PR URL, assignee and labels, plus the issue's Touchable files so the working session knows its scope.
 
 ## Mode: `finish`
@@ -99,4 +112,9 @@ A PR's labels live on its issue number, so the label calls above work for both.
    - Then, for each `- [ ]` item under `## Verification`, tick it (`- [x]`) only if the PR body or a PR comment holds evidence for that exact item: command output, a link, or a pasted transcript. Items only a human can run stay unticked.
    - Write the body back the API way (see "Labels and ready state").
 8. **Ready.** All three go through the API (see "Labels and ready state"): mark the PR ready, remove `in-progress` from the issue, add `agent-authored` to the PR.
-9. **Report:** the PR URL, the check results, the scope result, and which checklist items are ticked and which still need a human.
+9. **Report as a PR comment**, in the comment format, and print the same text to the session.
+   - Status `ACTION NEEDED` if any checklist item still needs a human, and line 2 names them. Otherwise `DONE`, and line 2 is `Review and merge.`
+   - Bullets: the checks result, the scope result, and anything a reviewer should decide or watch. Decisions and risks only.
+   - Fold the PR URL, each check's exit code and output tail, the changed files with their Touchable entries, and the ticked and unticked items into `Full notes`.
+   - Lint it (see "Writing PR bodies and comments"), then post it with `gh api repos/<repo>/issues/<number>/comments -F body=@<file>`.
+   - Post it last. Nothing this skill does afterwards may add a PR comment, so this one stays `.comments[-1]`.
