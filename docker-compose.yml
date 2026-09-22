@@ -16,7 +16,9 @@ services:
     ports:
       - "127.0.0.1:55432:5432"
     volumes:
-      - orderflow-postgres-data:/var/lib/postgresql/data
+      # Postgres 18 images want the mount one level up, at /var/lib/postgresql, and keep the
+      # cluster in a version-named subdirectory so a later pg_upgrade --link works.
+      - orderflow-postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U orderflow -d orderflow"]
       interval: 5s

@@ -36,12 +36,16 @@ port is bound to `127.0.0.1`, and `.env` is never committed.
 
 ## Everyday commands
 
-| Task                   | Command                                                                                                                                                                       |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Regenerate the client  | `pnpm --filter @orderflow/db run generate`                                                                                                                                    |
-| Apply migrations       | `pnpm db:migrate`                                                                                                                                                             |
-| Check for schema drift | `pnpm --filter @orderflow/db exec prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --shadow-database-url "$DATABASE_URL" --exit-code` |
-| Open the data in a UI  | `pnpm --filter @orderflow/db exec prisma studio`                                                                                                                              |
+| Task                   | Command                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Regenerate the client  | `pnpm --filter @orderflow/db run generate`                                                                                              |
+| Apply migrations       | `pnpm db:migrate`                                                                                                                       |
+| Check for schema drift | `pnpm --filter @orderflow/db exec prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code` |
+| Open the data in a UI  | `pnpm --filter @orderflow/db exec prisma studio`                                                                                        |
+
+The drift check replays the migrations into a scratch database named `orderflow_shadow`, which
+`prisma.config.ts` points at. Create it once with
+`docker compose exec postgres createdb -U orderflow orderflow_shadow`.
 
 The client is generated into `src/generated/`, which is not committed. `prisma generate` runs
 as a Turborepo dependency of `build`, `typecheck`, `lint` and `test`, so a fresh clone needs

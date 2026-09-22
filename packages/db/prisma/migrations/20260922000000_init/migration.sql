@@ -269,8 +269,7 @@ CREATE OR REPLACE FUNCTION "orderflow_ledger_is_append_only"() RETURNS TRIGGER A
 BEGIN
     RAISE EXCEPTION
         'ledger is append-only: % on % is forbidden; write a CORRECTION transaction instead',
-        TG_OP, TG_TABLE_NAME
-        USING ERRCODE = 'restrict_violation';
+        TG_OP, TG_TABLE_NAME;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -294,8 +293,7 @@ BEGIN
     IF NEW."type" = 'TREASURY' AND EXISTS (
         SELECT 1 FROM "Account" WHERE "type" = 'TREASURY' AND "id" <> NEW."id"
     ) THEN
-        RAISE EXCEPTION 'there is exactly one TREASURY account'
-            USING ERRCODE = 'unique_violation';
+        RAISE EXCEPTION 'there is exactly one TREASURY account';
     END IF;
     RETURN NEW;
 END;
