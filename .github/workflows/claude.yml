@@ -1,4 +1,8 @@
-name: Claude
+name: "Claude: @claude"
+
+# For issue_comment events GitHub's default run title is the latest commit
+# message on main, which has nothing to do with the comment. Say what it is.
+run-name: "@claude on #${{ github.event.issue.number || github.event.pull_request.number }} by ${{ github.actor }}"
 
 on:
   issue_comment:
@@ -17,12 +21,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  claude:
-    name: claude
+  answer:
+    name: answer comment
     # Owner only. A stranger typing @claude on this public repo must not spend
     # money, and orderflow-agent must not trigger a run either.
     # No label trigger: agent-ready is a state, not a command. Starting a
     # story from CI is not wired yet; see the backlog issue.
+    # Every comment the review bot posts fires this event too; the actor check
+    # skips it, and the skipped run in the Actions list is expected.
     if: >-
       github.actor == 'H-Gomez' &&
       contains(github.event.comment.body, '@claude')
