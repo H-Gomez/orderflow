@@ -19,11 +19,11 @@ An entry carries at minimum:
 - the account
 - the currency
 - the amount, signed (§2)
-- the entry type (§5); all entries in a transaction share the same type
+- the entry type (§6); all entries in a transaction share the same type
 - when it was written
 - a reference to its cause: a fill id, a seed run id, or the transaction being corrected
 
-An entry carries no running balance, no "balance after" field, and no link to a stored balance. There is nothing of that kind to link to (§4).
+An entry carries no running balance, no "balance after" field, and no link to a stored balance. There is nothing of that kind to link to.
 
 ## 2. Sign is direction
 
