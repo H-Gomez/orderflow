@@ -1,0 +1,282 @@
+// OrderFlow schema. The rules it implements live in docs/domain/ledger.md and
+// docs/domain/accounts.md; where the two disagree with CLAUDE.md, CLAUDE.md wins.
+//
+// Two rules shape everything below:
+//   - No balance is stored. A balance is the sum of an account's entries, computed at read
+//     time (ledger.md section 5). There is deliberately no balance column, cache or view.
+//   - Money is NUMERIC(38, 18) everywhere: every amount, price, quantity and OHLCV value
+//     (ledger.md section 7). Amounts are exact decimals: never a binary approximation in a
+//     column, and never a JavaScript number in code.
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+
+/// USER and BOT trade; TREASURY is the system's own account and the source of every
+/// DEPOSIT. The ledger cannot tell them apart: type lives here, never on an entry
+/// (accounts.md section 1).
+enum AccountType {
+  USER
+  BOT
+  TREASURY
+}
+
+/// The three entry types M0 has (ledger.md section 6). A CORRECTION is written by a human,
+/// deliberately, and mirrors every entry of the transaction it references.
+enum EntryType {
+  DEPOSIT
+  TRADE
+  CORRECTION
+}
+
+/// A hold starts ACTIVE at placement. RELEASED and CONVERTED are terminal; there is no path
+/// back (accounts.md section 4.2).
+enum HoldState {
+  ACTIVE
+  RELEASED
+  CONVERTED
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+}
+
+/// Who produced a message in a Desk Analyst conversation.
+enum MessageRole {
+  USER
+  ASSISTANT
+  TOOL
+}
+
+/// A human who signed up. Identity rests on the OIDC subject, never on an email, because an
+/// email may change without the account changing (accounts.md section 2).
+model User {
+  id          String   @id @default(uuid(7))
+  authSubject String   @unique
+  createdAt   DateTime @default(now())
+
+  account       Account?
+  conversations Conversation[]
+}
+
+/// Anything that can hold money. One account holds every currency, so currency lives on the
+/// entry rather than here (accounts.md section 1).
+///
+/// No balance column: see the header. `userId` is unique, so a User has at most one account
+/// and a USER account belongs to exactly one User. A BOT authenticates with an API key issued
+/// by the seed script; only its hash is stored, and rotation is accounts.md open question 7.
+/// At most one TREASURY row exists, enforced by a trigger in the initial migration.
+model Account {
+  id         String      @id @default(uuid(7))
+  type       AccountType
+  userId     String?     @unique
+  apiKeyHash String?     @unique
+  createdAt  DateTime    @default(now())
+
+  user    User?        @relation(fields: [userId], references: [id])
+  entries LedgerEntry[]
+  holds   Hold[]
+  orders  Order[]
+
+  @@index([type])
+}
+
+/// A tradable pair, identified by its BASE-QUOTE symbol (for example BTC-USD). Instruments
+/// cap price and quantity at 8 decimal places (ledger.md section 7); that cap is enforced at
+/// order placement, not by these columns.
+model Instrument {
+  id            String   @id @default(uuid(7))
+  symbol        String   @unique
+  baseCurrency  String
+  quoteCurrency String
+  createdAt     DateTime @default(now())
+
+  orders  Order[]
+  fills   Fill[]
+  candles Candle[]
+}
+
+/// The unit of change in the ledger. Its entries are written atomically and sum to zero per
+/// currency (ledger.md section 3).
+///
+/// `type` sits here rather than on the entry, which makes "all entries in a transaction share
+/// the same type" (ledger.md section 1) structural rather than a convention.
+///
+/// `causeKey` is the transaction's cause: the fill id for a trade, the seed run plus account
+/// for a deposit. It is unique, so re-posting the same cause is a no-op that succeeds, which
+/// is how idempotency on event ID reaches the ledger (ledger.md section 3).
+///
+/// `correctsTransactionId` is set only by a CORRECTION and points at the transaction it
+/// mirrors. The wrong transaction itself is never touched (ledger.md section 4).
+model LedgerTransaction {
+  id                    String    @id @default(uuid(7))
+  type                  EntryType
+  causeKey              String    @unique
+  correctsTransactionId String?
+  createdAt             DateTime  @default(now())
+
+  corrects   LedgerTransaction?  @relation("Correction", fields: [correctsTransactionId], references: [id])
+  correctedBy LedgerTransaction[] @relation("Correction")
+  entries    LedgerEntry[]
+
+  @@index([createdAt])
+}
+
+/// One account's holding of one currency changed by one amount.
+///
+/// The amount is signed: negative left the account, positive arrived, and a debit/credit pair
+/// is two entries of equal magnitude and opposite sign. There is no direction field, and an
+/// amount is never zero (ledger.md section 2).
+///
+/// An entry carries no running balance and no "balance after": there is nothing of that kind
+/// to carry (ledger.md section 1). It reaches its type and its cause through its transaction.
+///
+/// Entries are append-only. A trigger in the initial migration rejects UPDATE and DELETE.
+model LedgerEntry {
+  id            String   @id @default(uuid(7))
+  transactionId String
+  accountId     String
+  currency      String
+  amount        Decimal  @db.Decimal(38, 18)
+  createdAt     DateTime @default(now())
+
+  transaction LedgerTransaction @relation(fields: [transactionId], references: [id])
+  account     Account           @relation(fields: [accountId], references: [id])
+
+  @@index([transactionId])
+  @@index([accountId, currency])
+}
+
+/// Stops an account committing the same money to two open orders. A hold is not a ledger
+/// entry: placing an order moves nothing (accounts.md section 4).
+///
+/// `amount` is the amount still held. A partial fill converts the filled portion and reduces
+/// this in place, so one hold may shrink through several conversions (accounts.md section
+/// 4.2). Hold is the only money-related table whose rows may be updated.
+model Hold {
+  id        String    @id @default(uuid(7))
+  accountId String
+  orderId   String    @unique
+  currency  String
+  amount    Decimal   @db.Decimal(38, 18)
+  state     HoldState @default(ACTIVE)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id])
+
+  @@index([accountId, currency, state])
+}
+
+/// Inert storage in M0: the seed script writes orders, and M2 gives them behaviour. Order
+/// states are docs/domain/order-lifecycle.md's to define, so no status column is invented
+/// here.
+model Order {
+  id           String    @id @default(uuid(7))
+  accountId    String
+  instrumentId String
+  side         OrderSide
+  type         OrderType
+  price        Decimal?  @db.Decimal(38, 18)
+  quantity     Decimal   @db.Decimal(38, 18)
+  createdAt    DateTime  @default(now())
+
+  account    Account    @relation(fields: [accountId], references: [id])
+  instrument Instrument @relation(fields: [instrumentId], references: [id])
+  hold       Hold?
+  buyFills   Fill[]     @relation("BuyOrder")
+  sellFills  Fill[]     @relation("SellOrder")
+
+  @@index([accountId, createdAt])
+  @@index([instrumentId, createdAt])
+}
+
+/// Inert storage in M0: the seed script writes synthetic fills so the Desk Analyst has ground
+/// truth before the matching engine exists. Order references are optional because a synthetic
+/// fill may have no order behind it. Matching rules belong to docs/domain/matching.md.
+model Fill {
+  id           String   @id @default(uuid(7))
+  instrumentId String
+  price        Decimal  @db.Decimal(38, 18)
+  quantity     Decimal  @db.Decimal(38, 18)
+  buyOrderId   String?
+  sellOrderId  String?
+  createdAt    DateTime @default(now())
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id])
+  buyOrder   Order?     @relation("BuyOrder", fields: [buyOrderId], references: [id])
+  sellOrder  Order?     @relation("SellOrder", fields: [sellOrderId], references: [id])
+
+  @@index([instrumentId, createdAt])
+}
+
+/// Seeded synthetic candles until M2. The API serves GET /candles from these.
+model Candle {
+  id           String   @id @default(uuid(7))
+  instrumentId String
+  interval     String
+  openTime     DateTime
+  open         Decimal  @db.Decimal(38, 18)
+  high         Decimal  @db.Decimal(38, 18)
+  low          Decimal  @db.Decimal(38, 18)
+  close        Decimal  @db.Decimal(38, 18)
+  volume       Decimal  @db.Decimal(38, 18)
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id])
+
+  @@unique([instrumentId, interval, openTime])
+}
+
+/// Empty until M2, when the engine starts publishing through it. The event catalogue is
+/// docs/events.md's to define, so this stays a generic envelope.
+model OutboxEvent {
+  id          String    @id @default(uuid(7))
+  type        String
+  payload     Json
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+
+  @@index([publishedAt, createdAt])
+}
+
+/// Per-user Desk Analyst conversation state.
+model Conversation {
+  id        String   @id @default(uuid(7))
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id])
+  messages Message[]
+
+  @@index([userId, createdAt])
+}
+
+/// One turn of a conversation. `toolCalls` records the tool calls behind the message, so a
+/// grounded answer stays auditable: the assistant never states a number it did not get from a
+/// tool.
+model Message {
+  id             String      @id @default(uuid(7))
+  conversationId String
+  role           MessageRole
+  content        String
+  toolCalls      Json?
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, createdAt])
+}

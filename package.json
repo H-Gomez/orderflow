@@ -13,6 +13,9 @@
     "lint": "turbo run lint",
     "lint:comment": "node packages/comment-lint/src/cli.ts",
     "test": "turbo run test",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @orderflow/db run migrate",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
