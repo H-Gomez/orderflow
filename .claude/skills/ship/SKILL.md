@@ -91,7 +91,7 @@ A PR's labels live on its issue number, so the label calls above work for both.
    - Stop if `git status --porcelain` is not empty.
    - `git fetch origin`. Stop if `git rev-parse HEAD` differs from `git rev-parse @{u}`. The evidence must describe the pushed code.
 3. **Changed files:** `git diff --name-only origin/<base>...HEAD`.
-4. **File types.** Stop, naming the file, if any changed file is something other than the list below. For a source file in a language this repo doesn't support yet, say "language not supported yet", adding "(Python support arrives with STORY-023)" for `.py`. Otherwise say why the file isn't allowed. These are filename rules, not path rules, so a directory such as `.github/` grants nothing on its own.
+4. **File types.** Stop, naming the file, if any changed file is something other than the list below. For a source file in a language this repo doesn't support yet, say "language not supported yet", adding "(Python support arrives with STORY-023)" for `.py`. Otherwise say why the file isn't allowed. Most of these are filename rules, so a directory such as `.github/` grants nothing on its own; where an entry names a path, that path is part of the rule.
    - TypeScript: `.ts`, `.tsx`, `.mts`, `.cts`
    - Markdown: `.md`
    - Config:
@@ -99,16 +99,31 @@ A PR's labels live on its issue number, so the label calls above work for both.
      - `*.config.js`, `*.config.mjs`, `*.config.cjs`
      - repo dotfiles such as `.gitignore`, `.npmrc`, `.nvmrc`, `.prettierignore`
      - `.env.example`, and only that name. Any other `.env` file is a secret and never ships.
-   - Database, and only under a `prisma/` directory:
-     - `.prisma`, the schema
-     - `.sql`, and only under `prisma/migrations/`, so a migration ships but a loose script does not
-     - `migration_lock.toml`, which Prisma writes beside the migrations
+   - Database, each at the path named and nowhere else:
+     - `.prisma`, the schema, under a `prisma/` directory
+     - `.sql`, only under `**/prisma/migrations/`, so a migration ships but a loose script such as `scripts/cleanup.sql` does not
+     - `migration_lock.toml`, only directly under `**/prisma/migrations/`, where Prisma writes it
    - GitHub metadata: the extensionless `CODEOWNERS`, and only at `CODEOWNERS`, `.github/CODEOWNERS` or `docs/CODEOWNERS`, never in a subdirectory of those — the three paths GitHub reads it from
 5. **Migrations.** The step above admits a migration by its path; this one reads what is in it, because a file type says nothing about what the SQL does.
-   - Stop if a migration file that already exists on `origin/<base>` has been modified. A committed migration is never edited (CLAUDE.md); a change is a new migration. `git diff --diff-filter=M --name-only origin/<base>...HEAD -- "*/prisma/migrations/*"` lists them.
-   - Read every added or changed `prisma/migrations/**/*.sql`. Stop, quoting the file and the line, if it drops a table, schema, database, index or column, truncates, or deletes rows: `grep -niE "\b(drop\s+(table|schema|database|index|column)|truncate|delete\s+from)\b"` over those files finds them.
-   - Stopping here is not a refusal. Destructive operations need a human's approval (CLAUDE.md), and this is where it is asked for. Say plainly what the statement does and what it would destroy, and let the human decide. If they approve it in the session, say so in the PR comment and carry on.
-   - A trigger, function or constraint that a migration replaces with `CREATE OR REPLACE` is not destructive and does not stop anything.
+   - **A migration already on the branch point is never touched.** Stop if any is modified, renamed or deleted, and name each one. A committed migration is never edited (CLAUDE.md); a change is a new migration. There is no approval path for this stop: a human who wants it anyway edits the branch themselves.
+
+     ```sh
+     git diff --diff-filter=MRD --name-only origin/<base>...HEAD -- "*prisma/migrations/*"
+     ```
+
+   - **Read every added migration.** Stop, quoting the file and the line, on a statement that destroys data or weakens the money rules.
+
+     ```sh
+     files=$(git diff --diff-filter=A --name-only origin/<base>...HEAD -- "*prisma/migrations/*.sql")
+     [ -n "$files" ] && grep -HniE \
+       "(drop[[:space:]]+(table|schema|database|index|column|constraint|trigger|function|type|view|sequence)|[[:space:]]drop[[:space:]]+\"|truncate|delete[[:space:]]+from|update[[:space:]]+\"?ledger|double[[:space:]]+precision|[[:space:]]real[[:space:]]|[[:space:]]float)" \
+       $files
+     ```
+
+     `[[:space:]]` rather than `\s`, because `\s` is a GNU extension and a pattern that silently matches nothing is worse than no check. The sweep is deliberately wider than "dropping things": `UPDATE`/`DELETE` against a ledger table and a column moved to `double precision`, `real` or a float type each break an invariant in CLAUDE.md, and a migration is the one place they could arrive unnoticed.
+
+   - **A hit is a reason to read the line, not a verdict.** If it is inside a comment or a string literal, or it is a `DROP TRIGGER`/`DROP FUNCTION` immediately followed by the `CREATE` that replaces it, say so and carry on. `CREATE OR REPLACE` of a function or trigger never matches and never stops anything.
+   - **A real hit ends the run, as line 22 says:** report what the statement would destroy in plain words, leave the PR in draft, and stop. Destructive operations need a human's approval (CLAUDE.md), and this is where it is asked for, not granted. If the human then approves it, run `finish` again; at this step, quote their approval verbatim under `## Evidence` and in the report comment, so the record lives in the PR rather than in one session's memory, and continue. Approval covers the statement quoted and nothing else.
 6. **Scope.**
    - Every changed file must match an entry in the issue's Touchable files. Entries are globs, with `**` matching any depth. Stop and list every file that matches none.
    - If the matching entry has a restriction in parentheses (e.g. "Workflow section only"), read `git diff origin/<base>...HEAD -- <file>` and confirm the change respects it. Stop if it doesn't, or if you can't tell.
