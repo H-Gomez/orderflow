@@ -8,10 +8,10 @@ Rules marked **Decision (#8)** were taken deliberately in this story. Everything
 
 ## 1. Account types
 
-| Type | Who | How it authenticates | Notes |
-|---|---|---|---|
-| `USER` | A human who signed up | Through the auth provider (OIDC); the API validates the JWT | Seeded with virtual USD on creation (§6) |
-| `BOT` | A member of the bot fleet | An API key issued by the seed script | Trades through the same public API as a user |
+| Type       | Who                                    | How it authenticates                                             | Notes                                                                              |
+| ---------- | -------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `USER`     | A human who signed up                  | Through the auth provider (OIDC); the API validates the JWT      | Seeded with virtual USD on creation (§6)                                           |
+| `BOT`      | A member of the bot fleet              | An API key issued by the seed script                             | Trades through the same public API as a user                                       |
 | `TREASURY` | The one account the system itself owns | Not a login; only the seed script and a human operator act as it | The source of every `DEPOSIT` (§6). The only account permitted to go negative (§6) |
 
 The ledger cannot tell them apart. Account type lives on the account, never on an entry. A trade between a user and a bot writes exactly the same entries as a trade between two users.
@@ -85,11 +85,11 @@ The seed script also writes synthetic fill history as `TRADE` transactions so th
 
 ## 7. What this file does not decide
 
-| # | Open question | Decided by |
-|---|---|---|
-| 1 | Account deletion or anonymisation. Entries are never deleted; the account would be anonymised instead | No owning story; not before there are production users |
-| 6 | Whether a user may hold more than one account | No owning story; not in M0 |
-| 7 | Whether bot API keys rotate, and how | No owning story; not before M4 |
-| 8 | Hold amount for a market buy: a slippage-bounded amount, or the full quote balance | M2 matching story |
+| #   | Open question                                                                                         | Decided by                                             |
+| --- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 1   | Account deletion or anonymisation. Entries are never deleted; the account would be anonymised instead | No owning story; not before there are production users |
+| 6   | Whether a user may hold more than one account                                                         | No owning story; not in M0                             |
+| 7   | Whether bot API keys rotate, and how                                                                  | No owning story; not before M4                         |
+| 8   | Hold amount for a market buy: a slippage-bounded amount, or the full quote balance                    | M2 matching story                                      |
 
 Numbers are shared with the table in ledger.md §8.

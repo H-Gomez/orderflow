@@ -77,11 +77,11 @@ A materialised view, a cache, a "balance after" column on an entry, or a snapsho
 
 **Decision (#8).** M0 has three entry types and no others.
 
-| Type | Written by | Entries |
-|---|---|---|
-| `DEPOSIT` | The seed script (#11), when an account is created or topped up | Treasury −X quote currency; destination account +X quote currency |
-| `TRADE` | A settled fill. In M0 the seed writes synthetic fills as proper pairs; from M2 the settlement worker writes them | Buyer −quote, buyer +base; seller +quote, seller −base. Four entries, two currencies, each currency sums to zero |
-| `CORRECTION` | A human, deliberately (§4) | Mirror of every entry in the transaction being reversed, referencing it |
+| Type         | Written by                                                                                                       | Entries                                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `DEPOSIT`    | The seed script (#11), when an account is created or topped up                                                   | Treasury −X quote currency; destination account +X quote currency                                                |
+| `TRADE`      | A settled fill. In M0 the seed writes synthetic fills as proper pairs; from M2 the settlement worker writes them | Buyer −quote, buyer +base; seller +quote, seller −base. Four entries, two currencies, each currency sums to zero |
+| `CORRECTION` | A human, deliberately (§4)                                                                                       | Mirror of every entry in the transaction being reversed, referencing it                                          |
 
 A `TRADE` writes the quote leg as price × quantity exactly (§7). Fees are not modelled in M0 (open question 4).
 
@@ -99,12 +99,12 @@ The 8 dp cap on price and quantity is the assumption everything above rests on. 
 
 ## 8. What this file does not decide
 
-| # | Open question | Decided by |
-|---|---|---|
-| 2 | Admin endpoint for writing a `CORRECTION` | No owning story yet |
-| 3 | Balance read performance; any cache is an ADR | No owning story; not before it is measured slow |
-| 4 | Trading fees: whether they exist, who pays, entry type, rounding point | No owning story; not before M2 |
-| 5 | Per-currency display scale beyond USD 2 and crypto 8 | #9 records it; UI story enforces it |
-| 9 | Whether the production sum-to-zero check alerts or halts settlement on breach | M5 |
+| #   | Open question                                                                 | Decided by                                      |
+| --- | ----------------------------------------------------------------------------- | ----------------------------------------------- |
+| 2   | Admin endpoint for writing a `CORRECTION`                                     | No owning story yet                             |
+| 3   | Balance read performance; any cache is an ADR                                 | No owning story; not before it is measured slow |
+| 4   | Trading fees: whether they exist, who pays, entry type, rounding point        | No owning story; not before M2                  |
+| 5   | Per-currency display scale beyond USD 2 and crypto 8                          | #9 records it; UI story enforces it             |
+| 9   | Whether the production sum-to-zero check alerts or halts settlement on breach | M5                                              |
 
 Numbers are shared with the table in accounts.md §7.
