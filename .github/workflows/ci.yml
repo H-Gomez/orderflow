@@ -14,10 +14,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: checks
+  check:
+    # One check per stage so the PR page shows CI / typecheck, CI / lint,
+    # CI / format:check and CI / test as separate lines. The ruleset's
+    # required status checks must list these four names, not "checks".
+    name: ${{ matrix.check }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [typecheck, lint, "format:check", test]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -34,14 +41,5 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Format check
-        run: pnpm format:check
-
-      - name: Test
-        run: pnpm test
+      - name: Run ${{ matrix.check }}
+        run: pnpm ${{ matrix.check }}
