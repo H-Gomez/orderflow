@@ -35,7 +35,7 @@ Filled by hand. Log a row when a PR merges or closes. Fill the weekly summary at
 | chore | #50 | 2026-09-21 | 2026-09-21 | human  | -          | 0             | -        | merged  | -             | Chore: workflow guide in repo; story ID = issue no.; review turns 40      |
 | chore | #52 | 2026-09-21 | 2026-09-21 | human  | -          | 0             | -        | merged  | -             | Chore: correct MCP tool name for Claude to post PR comments               |
 | chore | #53 | 2026-09-21 | 2026-09-21 | human  | -          | 0             | -        | merged  | -             | Chore: clarify Claude review prompt output and inline comments            |
-| #8    | #55 | 2026-09-19 | 2026-09-21 | human  | 1          | 1             | -        | merged  | -             | story: add domain docs for ledger accounts                                |
+| 003   | #55 | 2026-09-16 | 2026-09-22 | human  | 1          | 3             | ?        | merged  | 0             | story: add domain docs for ledger accounts                                |
 
 ## Weekly summary
 
@@ -47,4 +47,4 @@ Filled by hand. Log a row when a PR merges or closes. Fill the weekly summary at
 | Week of    | Stories merged | Median cycle time (days) | Agent-authored | Rework rate | Rejected | Defect escapes | Spec-debt fixes |
 | ---------- | -------------- | ------------------------ | -------------- | ----------- | -------- | -------------- | --------------- |
 | 2026-09-14 | 8              | 0                        | 63%            | ?           | 0        | 2              | 2               |
-| 2026-09-21 | 1              | 0                        | 100%           | ?           | 0        | 2              | 0               |
+| 2026-09-21 | 2              | 3                        | 50%            | ?           | 0        | 2              | 0               |
