@@ -104,22 +104,27 @@ A PR's labels live on its issue number, so the label calls above work for both.
      - `.sql`, and only under `prisma/migrations/`, so a migration ships but a loose script does not
      - `migration_lock.toml`, which Prisma writes beside the migrations
    - GitHub metadata: the extensionless `CODEOWNERS`, and only at `CODEOWNERS`, `.github/CODEOWNERS` or `docs/CODEOWNERS`, never in a subdirectory of those — the three paths GitHub reads it from
-5. **Scope.**
+5. **Migrations.** The step above admits a migration by its path; this one reads what is in it, because a file type says nothing about what the SQL does.
+   - Stop if a migration file that already exists on `origin/<base>` has been modified. A committed migration is never edited (CLAUDE.md); a change is a new migration. `git diff --diff-filter=M --name-only origin/<base>...HEAD -- "*/prisma/migrations/*"` lists them.
+   - Read every added or changed `prisma/migrations/**/*.sql`. Stop, quoting the file and the line, if it drops a table, schema, database, index or column, truncates, or deletes rows: `grep -niE "\b(drop\s+(table|schema|database|index|column)|truncate|delete\s+from)\b"` over those files finds them.
+   - Stopping here is not a refusal. Destructive operations need a human's approval (CLAUDE.md), and this is where it is asked for. Say plainly what the statement does and what it would destroy, and let the human decide. If they approve it in the session, say so in the PR comment and carry on.
+   - A trigger, function or constraint that a migration replaces with `CREATE OR REPLACE` is not destructive and does not stop anything.
+6. **Scope.**
    - Every changed file must match an entry in the issue's Touchable files. Entries are globs, with `**` matching any depth. Stop and list every file that matches none.
    - If the matching entry has a restriction in parentheses (e.g. "Workflow section only"), read `git diff origin/<base>...HEAD -- <file>` and confirm the change respects it. Stop if it doesn't, or if you can't tell.
    - Also stop if a changed file falls under anything in the issue's "Out of scope" section.
-6. **Checks.**
+7. **Checks.**
    - Run each in order, and record its exit code and the last lines of its output: `pnpm format:check`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
    - Run all five even if one fails, so the report is complete. Then stop if any failed.
    - If `pnpm` is not on `PATH`, use `corepack enable --install-directory <scratch>/bin pnpm` and prepend that directory to `PATH` for these commands. Don't change global setup.
-7. **Evidence and ticks.**
+8. **Evidence and ticks.**
    - Under `## Evidence`, add or update a "Checks" entry (the commit SHA, then each command with its exit code and output tail) and a "Scope" entry (the changed files, each with the Touchable entry it matched).
    - Then, for each `- [ ]` item under `## Verification`, tick it (`- [x]`) only if the PR body or a PR comment holds evidence for that exact item: command output, a link, or a pasted transcript. Items only a human can run stay unticked.
    - Write the body back the API way (see "Labels and ready state").
-8. **Ready.** All three go through the API (see "Labels and ready state"): mark the PR ready, remove `in-progress` from the issue, add `agent-authored` to the PR.
-9. **Report as a PR comment**, in the comment format, and print the same text to the session.
-   - Status `ACTION NEEDED` if any checklist item still needs a human, and line 2 names them. Otherwise `DONE`, and line 2 is `Review and merge.`
-   - Bullets: the checks result, the scope result, and anything a reviewer should decide or watch. Decisions and risks only.
-   - Fold the PR URL, each check's exit code and output tail, the changed files with their Touchable entries, and the ticked and unticked items into `Full notes`.
-   - Lint it (see "Writing PR bodies and comments"), then post it with `gh api repos/<repo>/issues/<number>/comments -F body=@<file>`.
-   - Post it last. Nothing this skill does afterwards may add a PR comment, so this one stays `.comments[-1]`.
+9. **Ready.** All three go through the API (see "Labels and ready state"): mark the PR ready, remove `in-progress` from the issue, add `agent-authored` to the PR.
+10. **Report as a PR comment**, in the comment format, and print the same text to the session.
+    - Status `ACTION NEEDED` if any checklist item still needs a human, and line 2 names them. Otherwise `DONE`, and line 2 is `Review and merge.`
+    - Bullets: the checks result, the scope result, and anything a reviewer should decide or watch. Decisions and risks only.
+    - Fold the PR URL, each check's exit code and output tail, the changed files with their Touchable entries, and the ticked and unticked items into `Full notes`.
+    - Lint it (see "Writing PR bodies and comments"), then post it with `gh api repos/<repo>/issues/<number>/comments -F body=@<file>`.
+    - Post it last. Nothing this skill does afterwards may add a PR comment, so this one stays `.comments[-1]`.
