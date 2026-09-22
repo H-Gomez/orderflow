@@ -63,7 +63,7 @@ At conversion, the hold's state change, the fill record and the `TRADE` ledger t
 
 ### 4.4 Invariant
 
-The sum of an account's active holds in a currency never exceeds its balance in that currency. It follows from §4.3 and §5 and is stated here so #9 can test it.
+The sum of an account's active holds in a currency never exceeds its balance in that currency. It follows from §4.3 and §5 and is stated here so #9 can test it. This holds because placement checks buying power (§4.3) and a correction may not breach it (ledger.md §4).
 
 ## 5. Buying power
 

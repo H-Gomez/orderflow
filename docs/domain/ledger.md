@@ -56,7 +56,7 @@ T2  CORRECTION   Treasury  +10000 USD   Alice  -10000 USD   (mirrors T1, referen
 T3  DEPOSIT      Treasury   -1000 USD   Alice   +1000 USD   (the right one)
 ```
 
-**Decision (#8).** A `CORRECTION` is written by a human, deliberately, never automatically. In M0 no code path writes one; it is done by a human with database access. An admin endpoint for corrections is open question 2.
+**Decision (#8).** A `CORRECTION` is written by a human, deliberately, never automatically. A correction may not reduce an account's balance below the sum of its active holds (accounts.md §4.4). If it would, the affected orders are cancelled first, releasing their holds, and the correction follows. In M0 no code path writes one; it is done by a human with database access. An admin endpoint for corrections is open question 2.
 
 ## 5. Sum to zero, and why balances are never stored
 
