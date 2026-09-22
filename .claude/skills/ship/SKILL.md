@@ -98,6 +98,11 @@ A PR's labels live on its issue number, so the label calls above work for both.
      - `.json`, `.yaml`, `.yml`
      - `*.config.js`, `*.config.mjs`, `*.config.cjs`
      - repo dotfiles such as `.gitignore`, `.npmrc`, `.nvmrc`, `.prettierignore`
+     - `.env.example`, and only that name. Any other `.env` file is a secret and never ships.
+   - Database, and only under a `prisma/` directory:
+     - `.prisma`, the schema
+     - `.sql`, and only under `prisma/migrations/`, so a migration ships but a loose script does not
+     - `migration_lock.toml`, which Prisma writes beside the migrations
    - GitHub metadata: the extensionless `CODEOWNERS`, and only at `CODEOWNERS`, `.github/CODEOWNERS` or `docs/CODEOWNERS`, never in a subdirectory of those — the three paths GitHub reads it from
 5. **Scope.**
    - Every changed file must match an entry in the issue's Touchable files. Entries are globs, with `**` matching any depth. Stop and list every file that matches none.
