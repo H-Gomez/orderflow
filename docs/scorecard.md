@@ -4,7 +4,7 @@ Filled by hand. Log a row when a PR merges or closes. Fill the weekly summary at
 
 ## Story log
 
-- **Story:** the story ID. From 2026-09-21 this is the issue number (`#NN`). `chore` marks a PR with no story issue.
+- **Story:** the story ID: the lowercased `STORY-NNN` alias if the issue title has one (e.g. `001d`), otherwise the issue number (`#NN`), as for every story from 2026-09-21. `chore` marks a PR with no story issue.
 - **Spec'd / Closed:** dates (YYYY-MM-DD). Cycle time is Closed minus Spec'd. A chore's Spec'd is the date its PR was opened.
 - **Author:** `agent`, `human` or `mixed`.
 - **Plan edits:** corrections made to the agent's plan before approval.
