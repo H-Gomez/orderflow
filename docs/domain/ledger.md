@@ -1,184 +1,110 @@
 # Ledger
 
-How OrderFlow records money movement. This file and [accounts.md](accounts.md) are the
-source the rest of the system is built from: [CLAUDE.md](../../CLAUDE.md) states these rules
-as invariants, and this file is where they are defined. Where the two disagree, that is a bug
-in one of them, not a licence to choose.
+The ledger is the only record of money in OrderFlow. Every balance in the system is computed from it and from nothing else. This file states the rules. The schema that implements them is #9, and the seed script that first writes to it is #11.
 
-Scope: Milestone 0. Spot paper trading, no actual money, no custody and no withdrawals.
-Anything not settled here is listed under [Open questions](#open-questions) with the story
-that will settle it, and is never guessed at.
+Read with [accounts.md](./accounts.md) for account types, holds and buying power, and the Invariants block in [CLAUDE.md](../../CLAUDE.md) for the rules shared with the rest of the repo. Where a rule appears in both places, CLAUDE.md wins and this file is changed to match, never the reverse.
 
-## The model
+Rules marked **Decision (#8)** were taken deliberately in this story. Everything else traces to plan v4.1 §4.1 or CLAUDE.md. Anything undecided is in the open questions table at the end, with the story that will decide it.
 
-OrderFlow keeps a double-entry ledger. Value is never created or destroyed by a movement, only
-moved between accounts, so every movement is recorded twice: once leaving, once arriving.
+## 1. The model
 
-### An entry
+Money moves only as a set of entries that balance. An entry records that one account's holding of one currency changed by one amount. An entry never exists on its own: it belongs to a transaction, and a transaction's entries sum to zero per currency.
 
-One entry records one signed amount, in one currency, against one account, as part of one
-transaction. It carries:
+Money never enters or leaves the system. Seeding moves money from the treasury to another account (accounts.md §6), and the treasury's negative balance is the total ever seeded. In a production exchange the treasury would be a clearing account reconciled against a bank; here it represents virtual money and has nothing to reconcile against.
 
-| Field       | Meaning                                                          |
-| ----------- | ---------------------------------------------------------------- |
-| transaction | The transaction this entry belongs to. Never null.               |
-| account     | The account whose balance this entry moves.                      |
-| currency    | The currency of `amount`. See [Currency codes](#currency-codes). |
-| amount      | Signed. Negative leaves the account, positive arrives.           |
-| type        | The entry type, from [Entry types](#entry-types).                |
-| recorded at | When the entry was written. Set once, never changed.             |
+An entry carries at minimum:
 
-**Sign is direction.** A negative amount is a **debit**: value leaving that account. A positive
-amount is a **credit**: value arriving. The words name the sign; they are not a separate field
-that could disagree with it.
+- its own id
+- the transaction it belongs to
+- the account
+- the currency
+- the amount, signed (§2)
+- the entry type (§5); all entries in a transaction share the same type
+- when it was written
+- a reference to its cause: a fill id, a seed run id, or the transaction being corrected
 
-### A transaction
+An entry carries no running balance, no "balance after" field, and no link to a stored balance. There is nothing of that kind to link to (§4).
 
-A transaction is the unit of movement. Entries exist only inside one, and a transaction's
-entries are written together or not at all. There is no partial transaction and no entry
-without one.
+## 2. Sign is direction
 
-A transaction carries its own identity, its cause, and when it happened. The cause is what lets
-an answer be traced back later: a `DEPOSIT` names the seeding run, a `TRADE` names the fill it
-settles.
+**Decision (#8).** An entry's amount is signed. A negative amount left the account; a positive amount arrived. There is no separate direction field. Where CLAUDE.md or the plan says "a DEBIT/CREDIT pair", a debit is an entry with a negative amount, a credit is an entry with a positive amount, and the pair is two entries of equal magnitude and opposite sign in the same currency.
 
-## Money representation
+**Decision (#8).** An amount is never zero. A transaction that would write a zero entry is rejected. A zero entry can only come from a bug, such as a fill or seed that computed to nothing, and rejecting it makes that bug loud at write time instead of silent and permanent.
 
-Money is never binary floating point. No JavaScript `number`, no Prisma `Float`, no Postgres
-`real` and no Postgres `double precision`, anywhere, for any amount, price or quantity — not in
-a column, not in a fixture, not in a test. Binary floating point cannot represent `0.1`
-exactly, and a ledger that must sum to zero cannot afford a representation that makes
-`0.1 + 0.2 != 0.3` true.
+## 3. Transactions
 
-**The representation is Postgres `NUMERIC(38, 18)`, surfaced through Prisma as `Decimal`.**
+A transaction is the unit of change. It groups two or more entries and is written atomically: every entry commits or none does.
 
-- **Scale 18** — eighteen fractional digits. This is not the precision any single asset needs;
-  it is the precision a settled trade needs. Instruments constrain price and quantity to at
-  most **8 fractional digits each** (see below), so the product of a price and a quantity has at
-  most 16, and is therefore representable exactly. The ledger never rounds a settlement.
-- **Precision 38** — twenty integer digits, which is beyond any balance a paper exchange with a
-  seeded treasury can reach. It is chosen for headroom, not need.
-- **One column type for every currency.** USD at 2 decimal places and BTC at 8 share one
-  representation, so no schema branches per currency and no conversion sits between them.
+- A transaction has at least two entries. There is no exception. Seeding is two entries: a deduction from the treasury and an addition to the destination account.
+- Within a transaction, the entries sum to zero for each currency present. A transaction that does not is rejected before it commits; it is never written and flagged later.
+- A transaction may touch more than one currency. A trade does: the base currency moves one way and the quote currency the other, and each currency balances on its own.
+- A transaction is keyed by its cause (the fill id for a trade, the seed run and account for a deposit). Writing a transaction whose key already exists is a no-op that succeeds. This is how CLAUDE.md's "consumers are idempotent on event ID" reaches the ledger; the hold side of it is in accounts.md §4.
 
-**Rounding.** The ledger does not round. An amount is stored exactly as computed, and any
-computation that would need more than 18 fractional digits is an error, not a rounded value:
-it means an instrument was configured outside its permitted precision. Rounding exists only at
-display, to the currency's display scale, half away from zero. A rounded figure is never
-written back.
+## 4. Append-only
 
-**Instrument precision.** Each instrument declares the number of fractional digits its price
-and its quantity may carry, each at most 8. These are validation rules at the edge of the
-system, and they are what keeps the guarantee above true.
+The ledger is append-only, always. No entry is ever updated or deleted: not by the application, not by a migration, not by an admin, not by a cleanup script. A mistake is corrected by writing more history, never by editing it.
 
-### Currency codes
-
-Uppercase, two to ten characters, letters and digits only: `USD`, `BTC`, `ETH`, `SOL`. An
-instrument is written `BASE-QUOTE`, as in `BTC-USD`: the base is what is bought and sold, the
-quote is what it is priced in. A currency code is an identifier, never a display symbol.
-
-## Append-only
-
-**A ledger entry is never updated and never deleted.** Not to fix a typo, not to reverse a
-mistake, not during a migration, and not by a cleanup script. The ledger is the record of what
-happened, and what happened does not change.
-
-This is structural, not a convention to be careful about: nothing in the system may offer a way
-to mutate an entry.
+Two things this rule does not forbid: a schema migration may change how an entry is stored, never what it says; and append-only applies to any ledger that has ever been a source of truth, so a disposable test database is not one.
 
 ### Corrections
 
-**A correction is a new entry.** To undo a movement, write a new transaction of type
-`CORRECTION` that moves the value back, naming the transaction it corrects. The original stays
-exactly as it was written.
+A correction is a transaction of type `CORRECTION`, not a single entry. Its entries mirror every entry of the wrong transaction: equal magnitude, opposite sign, same currency, same accounts. The wrong transaction and the correction together sum to zero per currency. The correction references the wrong transaction's id. A correction never reverses part of a transaction, because that would break sum-to-zero. The wrong transaction stays visible forever. If a right version is needed, it follows as a separate new transaction.
 
-The result is that the ledger reads as a history rather than a current state: a wrong entry and
-its correction are both visible, in order, with the link between them. That is the point.
+```
+T1  DEPOSIT      Treasury  -10000 USD   Alice  +10000 USD   (the mistake, stays forever)
+T2  CORRECTION   Treasury  +10000 USD   Alice  -10000 USD   (mirrors T1, references T1)
+T3  DEPOSIT      Treasury   -1000 USD   Alice   +1000 USD   (the right one)
+```
 
-## Entries sum to zero
+**Decision (#8).** A `CORRECTION` is written by a human, deliberately, never automatically. In M0 no code path writes one; it is done by a human with database access. An admin endpoint for corrections is open question 2.
 
-**Every transaction's entries sum to zero, per currency.** Value moved out of one account
-arrived in another, so the two cancel. Per currency matters: a trade moves USD one way and BTC
-the other, and each side balances independently. A transaction whose entries do not sum to zero
-in every currency it touches is rejected before anything is written.
+## 5. Sum to zero, and why balances are never stored
 
-Because every transaction sums to zero, **the whole ledger sums to zero**, per currency, at all
-times. This holds for any subset of complete transactions, which is what makes it cheap to
-assert: it is a single query, at any moment, with no reconciliation window.
+The same rule at two levels:
 
-This is the invariant the project is built to advertise. It is property-tested, and asserted
-against the live database on a schedule.
+- Within any transaction, the entries sum to zero per currency. Enforced at write (§3).
+- Across the whole ledger, all entries sum to zero per currency. This follows from the first rule plus append-only: a sum of zero-sum groups is zero, and no group can be altered after the fact. It is not separately enforced; it is checked, by a property test in #9 and later by a scheduled job, and a failure means one of the two underlying rules was violated.
 
-## Balances are derived
+An account's balance in a currency is the sum of that account's entries in that currency, computed when it is read. A balance is never held in a field of its own. Balances are always derived.
 
-**An account's balance is the sum of its entries.** There is no balance column, no balance
-cache, no denormalised total and no materialised view. Not as an optimisation, not with a
-trigger keeping it honest.
+A stored balance is a second source of truth for the same fact. A bug, crash or partial write can let it drift from the ledger while the ledger itself still sums to zero, and then there is no way to tell which is right. The only defence is that a balance can come from one place: the entries.
 
-A stored balance is a second source of truth for something the ledger already knows, and the
-moment the two disagree, the system cannot say which is right. Deriving it means they cannot
-disagree. If summing becomes too slow, the answer is an index or a snapshot table that is
-explicitly a cache of a derivable value, decided in its own ADR — not a column that code is
-trusted to keep in step.
+A materialised view, a cache, a "balance after" column on an entry, or a snapshot table is a stored balance under another name and is forbidden by the same rule.
 
-Balance is per account and per currency: an account holds several currencies at once, and each
-sums independently.
+**Decision (#8).** If summing entries ever becomes too slow, the remedy is an ADR, not a column. No cache exists until an ADR is accepted, and that ADR must show the cache is derived, disposable, rebuildable from the ledger alone, and never read by anything that writes to the ledger.
 
-## Entry types
+## 6. Entry types
 
-Milestone 0 needs three:
+**Decision (#8).** M0 has three entry types and no others.
 
-| Type         | What it records                                                                    |
-| ------------ | ---------------------------------------------------------------------------------- |
-| `DEPOSIT`    | Funds issued from the treasury to an account. The only way money enters.           |
-| `TRADE`      | The settlement of one fill: both counterparties, both currencies, one transaction. |
-| `CORRECTION` | A deliberate reversal or adjustment of an earlier transaction, which it names.     |
+| Type | Written by | Entries |
+|---|---|---|
+| `DEPOSIT` | The seed script (#11), when an account is created or topped up | Treasury −X quote currency; destination account +X quote currency |
+| `TRADE` | A settled fill. In M0 the seed writes synthetic fills as proper pairs; from M2 the settlement worker writes them | Buyer −quote, buyer +base; seller +quote, seller −base. Four entries, two currencies, each currency sums to zero |
+| `CORRECTION` | A human, deliberately (§4) | Mirror of every entry in the transaction being reversed, referencing it |
 
-There is no withdrawal type: OrderFlow holds no actual money and pays none out.
+A `TRADE` writes the quote leg as price × quantity exactly (§7). Fees are not modelled in M0 (open question 4).
 
-## Holds are not ledger entries
+## 7. Money representation
 
-A hold reserves value that an account still owns; it does not move it. Nothing is debited when
-an order is placed, so nothing is written to the ledger. A hold is working state, and it lives
-in [accounts.md](accounts.md) with the rest of the account model.
+**Decision (#8).** This is the decision CLAUDE.md defers to this story.
 
-The ledger is written when a fill settles, and that transaction is what converts the reserved
-value into a movement. So holds change, and the money trail stays append-only.
+- Every amount, price and quantity is stored as Postgres `NUMERIC(38, 18)` and handled in TypeScript as Prisma's `Decimal`. No other type is allowed for money.
+- Binary floating point is never used for an amount: no `float`, `real` or `double precision` column, and no JavaScript `number` for money in code or in any example. An amount is never converted to a JavaScript `number` on any path that writes, compares or sums.
+- Instruments cap both price and quantity at 8 decimal places. A trade's quote leg is price × quantity, so it has at most 16 fractional digits, and scale 18 holds that exactly with margin. Precision 38 leaves 20 integer digits, more than any balance will reach.
+- The ledger never rounds. Every stored amount is the exact computed value. Rounding is permitted only at display (USD to 2 dp, crypto to 8 dp) and, if fees are introduced, at fee calculation before the fee entry is written. Mode: round half to even, because it does not bias totals over many operations.
+- A currency is identified by an uppercase ticker of three or four letters: `USD`, `BTC`, `ETH`. Fiat codes follow ISO 4217; crypto codes follow market convention and are not ISO codes. The code is the identity. There is no separate numeric currency id, and the same code always means the same asset.
 
-## Worked examples
+The 8 dp cap on price and quantity is the assumption everything above rests on. If it is ever raised, scale 18 stops being enough and the no-rounding guarantee goes with it. That change needs an ADR.
 
-**Seeding an account with 100,000 USD.** One transaction, type `DEPOSIT`, two entries:
+## 8. What this file does not decide
 
-| Account  | Currency | Amount     |
-| -------- | -------- | ---------- |
-| treasury | USD      | -100000.00 |
-| user     | USD      | +100000.00 |
+| # | Open question | Decided by |
+|---|---|---|
+| 2 | Admin endpoint for writing a `CORRECTION` | No owning story yet |
+| 3 | Balance read performance; any cache is an ADR | No owning story; not before it is measured slow |
+| 4 | Trading fees: whether they exist, who pays, entry type, rounding point | No owning story; not before M2 |
+| 5 | Per-currency display scale beyond USD 2 and crypto 8 | #9 records it; UI story enforces it |
+| 9 | Whether the production sum-to-zero check alerts or halts settlement on breach | M5 |
 
-Sums to zero in USD. The treasury's balance is now more negative by exactly what it issued,
-which is how the faucet is supposed to behave — see [accounts.md](accounts.md).
-
-**Settling a fill: 0.5 BTC at 60,000 USD.** One transaction, type `TRADE`, four entries:
-
-| Account | Currency | Amount    |
-| ------- | -------- | --------- |
-| buyer   | USD      | -30000.00 |
-| seller  | USD      | +30000.00 |
-| buyer   | BTC      | +0.5      |
-| seller  | BTC      | -0.5      |
-
-Sums to zero in USD and, separately, in BTC. Both counterparties move in one transaction,
-because a trade where one side settled and the other did not is not a state the ledger is
-allowed to be in.
-
-**Correcting the fill above.** A new transaction, type `CORRECTION`, naming the first, with all
-four signs reversed. Six entries now exist for this trade and none has been altered.
-
-## Open questions
-
-| Question                                                      | Settled by             |
-| ------------------------------------------------------------- | ---------------------- |
-| Trading fees: whether M0 charges any, and the entry type.     | TBD, no story yet      |
-| Whether an unbalanced transaction is rejected or quarantined. | TBD, no story yet      |
-| Per-currency display scales, as a table.                      | TBD, no story yet      |
-| How settlement is triggered and made idempotent on fill ID.   | M1, settlement.md      |
-| Order states and when a hold is placed or released.           | M1, order-lifecycle.md |
+Numbers are shared with the table in accounts.md §7.
