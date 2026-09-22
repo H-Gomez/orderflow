@@ -1,0 +1,55 @@
+name: Claude
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    name: claude
+    # Owner only. A stranger typing @claude on this public repo must not spend
+    # money, and orderflow-agent must not trigger a run either.
+    # No label trigger: agent-ready is a state, not a command. Starting a
+    # story from CI is not wired yet; see the backlog issue.
+    if: >-
+      github.actor == 'H-Gomez' &&
+      contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1.0.231
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Without --allowedTools the action runs in automation mode with no
+          # shell and no GitHub access, so it can only produce text.
+          claude_args: >-
+            --max-turns 30
+            --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
+            --append-system-prompt "Every comment you post on an issue or PR follows docs/conventions/agent-comments.md. Read it first."
+          # An @claude comment is an ad-hoc request and never starts a story.
+          prompt: >-
+            Answer the request in the comment that triggered this run.
+            Read CLAUDE.md first and obey every invariant in it.
+            Do not implement a story from a comment. Story work starts only
+            when the repository owner runs /ship start, so that it produces a
+            reviewable pull request. If asked to start one, say so and stop.
+            Never merge, never approve, never push to main, never force-push.
+            Never modify anything under .github/.

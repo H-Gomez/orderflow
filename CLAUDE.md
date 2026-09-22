@@ -45,6 +45,8 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 - Tests sit next to the code as `*.test.ts`.
 - Commits use Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`).
 - Language policy: TBD ([ADR-002](docs/adr/README.md)). Architecture beyond the layout above: TBD (ADR-001).
+- Agent comments on issues and PRs, review summaries and PR-body prose follow [docs/conventions/agent-comments.md](docs/conventions/agent-comments.md).
+  Check a body with `pnpm lint:comment`.
 - Decisions are recorded as ADRs in [docs/adr/](docs/adr/README.md). Lessons go in [LEARNINGS.md](LEARNINGS.md).
 
 ## Definition of done
@@ -56,11 +58,15 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 
 ## Workflow
 
-- One story, one branch, one PR. Branch name: `story-<id>-<slug>` (e.g. `story-001b-claude-md-docs-skeleton`).
+- One story, one branch, one PR.
+- Story identity is the issue number. Refer to work as `#NN`, not `STORY-NNN`. Branch `story-<issue>-<slug>`.
 - A story is a GitHub issue labelled `story`, with Context, Contract, Invariants, Out of scope, Verification
-  and Touchable files. Agents only pick up issues labelled `agent-ready`.
-- The PR body starts with `Closes #<issue>`.
-- Run a story with `/ship start <issue>` and `/ship finish` ([.claude/skills/ship/SKILL.md](.claude/skills/ship/SKILL.md)).
+  and Touchable files. The `agent-ready` label means the spec is complete. It does not start work; the human does.
+- The PR body starts with `Closes issue #<issue>`.
+- `/ship start` and `/ship finish` are typed by the human, never invoked by the agent. Outside those two skills, never assign an issue, create a branch, open a PR, or change labels. If a story is not claimed and no one has run /ship start, stop and say so. ([.claude/skills/ship/SKILL.md](.claude/skills/ship/SKILL.md)).
 - Agents open PRs. They never merge, approve, push to `main` or force-push.
 - Agent tokens lack the `read:org` scope, so use `gh api` REST or GraphQL for labels, PR bodies and ready state rather than `gh pr ready` or `gh issue edit --add-label`.
 - If the spec is ambiguous or conflicts with this file, stop and ask on the issue. Don't guess.
+- Comments on issues and PRs follow `docs/conventions/agent-comments.md.` Check a body with `pnpm lint:comment` before posting.
+- Never modify anything under `.github/`. Workflow files belong to the human; if a story seems to need a workflow change, say so on the issue and continue without it.
+- The process is `docs/workflow-guide.md.` Read §5.1 before starting a story.
