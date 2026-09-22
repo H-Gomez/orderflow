@@ -32,7 +32,7 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 - Only touch the files listed in the story's "Touchable files". Anything else is out of scope.
 - Never commit secrets or `.env` files.
 - Destructive operations are forbidden such as `pulumi destroy`, `DROP TABLE`, queue purges. If you need these to be run please ask for approval.
-- Money is never binary floating point: no JS `number`, Prisma `Float`, or Postgres `real`/`double precision` for amounts. It is `NUMERIC` via Decimal using `NUMERIC(38, 16)`. See [docs/domain/ledger.md](docs/domain/ledger.md) for reasons.
+- Money is never binary floating point: no JS `number`, Prisma `Float`, or Postgres `real`/`double precision` for amounts. It is `NUMERIC` via Decimal using `NUMERIC(38, 18)`. See [docs/domain/ledger.md](docs/domain/ledger.md) for reasons.
 - Every consumer is idempotent on event ID
 - The engine publishes only via the outbox
 - The assistant never states a number it didn't get from a tool
