@@ -17,7 +17,6 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
-
 /// USER and BOT trade; TREASURY is the system's own account and the source of every
 /// DEPOSIT. The ledger cannot tell them apart: type lives here, never on an entry
 /// (accounts.md section 1).
@@ -85,7 +84,7 @@ model Account {
   apiKeyHash String?     @unique
   createdAt  DateTime    @default(now())
 
-  user    User?        @relation(fields: [userId], references: [id])
+  user    User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
   entries LedgerEntry[]
   holds   Hold[]
   orders  Order[]
@@ -127,9 +126,9 @@ model LedgerTransaction {
   correctsTransactionId String?
   createdAt             DateTime  @default(now())
 
-  corrects   LedgerTransaction?  @relation("Correction", fields: [correctsTransactionId], references: [id])
+  corrects    LedgerTransaction?  @relation("Correction", fields: [correctsTransactionId], references: [id], onDelete: Restrict)
   correctedBy LedgerTransaction[] @relation("Correction")
-  entries    LedgerEntry[]
+  entries     LedgerEntry[]
 
   @@index([createdAt])
 }

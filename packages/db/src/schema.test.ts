@@ -5,25 +5,28 @@ import type { PrismaClient } from "./generated/prisma/client.js";
 import { AccountType, EntryType } from "./generated/prisma/enums.js";
 
 /**
- * These tests need the compose database (`pnpm db:up && pnpm db:migrate`). Without
- * DATABASE_URL they skip, so `pnpm test` stays green on a machine with no Docker; with it
- * they run for real. A skipped run proves nothing, so the PR says which of the two it was.
+ * The rules the database itself enforces, checked against a real one.
  *
- * Each rejection is checked twice: that the write is refused, and that the row is exactly as
+ * The database is made for this run and dropped after it (src/testing/global-setup.ts), so
+ * these tests never write into a database anyone keeps: the ledger is append-only, and rows
+ * written here would outlive the run. When no server answers, the URL is absent and every
+ * test below skips, which keeps `pnpm test` green on a machine with no Docker.
+ *
+ * Each rejection is checked twice: that the write was refused, and that the row is exactly as
  * it was afterwards. The second half is the one that matters, because a trigger that raised
  * after changing something would still satisfy the first.
  */
-const databaseUrl = process.env["DATABASE_URL"];
+const databaseUrl = process.env["ORDERFLOW_TEST_DATABASE_URL"];
 
 describe.skipIf(databaseUrl === undefined || databaseUrl === "")(
   "schema rules the database enforces",
   () => {
     let prisma: PrismaClient;
-    /** Unique per run, so repeated runs against one database never collide. */
+    /** Unique per run, so a repeated run never collides on a cause key. */
     const run = `test-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`;
 
     beforeAll(async () => {
-      prisma = createPrismaClient();
+      prisma = createPrismaClient({ connectionString: databaseUrl ?? "" });
       await prisma.$connect();
     });
 
@@ -49,152 +52,287 @@ describe.skipIf(databaseUrl === undefined || databaseUrl === "")(
         include: { entries: true },
       });
 
-    it("refuses to update a ledger entry, and leaves it untouched", async () => {
-      const account = await createAccount(AccountType.USER);
-      const { entries } = await createTransaction(account.id, "entry-update");
-      const entry = entries[0];
-      expect(entry).toBeDefined();
-      const id = entry?.id ?? "";
+    describe("append-only ledger (ledger.md section 4)", () => {
+      it("refuses to update a ledger entry, and leaves it untouched", async () => {
+        const account = await createAccount(AccountType.USER);
+        const { entries } = await createTransaction(account.id, "entry-update");
+        const entry = entries[0];
+        expect(entry).toBeDefined();
+        const id = entry?.id ?? "";
 
-      await expect(
-        prisma.ledgerEntry.update({ where: { id }, data: { amount: "1" } }),
-      ).rejects.toThrow(/append-only/u);
+        await expect(
+          prisma.ledgerEntry.update({ where: { id }, data: { amount: "1" } }),
+        ).rejects.toThrow(/append-only/u);
 
-      const after = await prisma.ledgerEntry.findUniqueOrThrow({ where: { id } });
-      expect(after.amount.toString()).toBe(entry?.amount.toString());
-    });
+        const after = await prisma.ledgerEntry.findUniqueOrThrow({ where: { id } });
+        expect(after.amount.toString()).toBe(entry?.amount.toString());
+      });
 
-    it("refuses to delete a ledger entry, and the entry survives", async () => {
-      const account = await createAccount(AccountType.USER);
-      const { entries } = await createTransaction(account.id, "entry-delete");
-      const id = entries[0]?.id ?? "";
+      it("refuses to delete a ledger entry, and the entry survives", async () => {
+        const account = await createAccount(AccountType.USER);
+        const { entries } = await createTransaction(account.id, "entry-delete");
+        const id = entries[0]?.id ?? "";
 
-      await expect(prisma.ledgerEntry.delete({ where: { id } })).rejects.toThrow(/append-only/u);
+        await expect(prisma.ledgerEntry.delete({ where: { id } })).rejects.toThrow(/append-only/u);
 
-      expect(await prisma.ledgerEntry.count({ where: { id } })).toBe(1);
-    });
+        expect(await prisma.ledgerEntry.count({ where: { id } })).toBe(1);
+      });
 
-    it("refuses to update a ledger transaction, and leaves it untouched", async () => {
-      const account = await createAccount(AccountType.USER);
-      const transaction = await createTransaction(account.id, "tx-update");
+      it("refuses to update a ledger transaction, and leaves it untouched", async () => {
+        const account = await createAccount(AccountType.USER);
+        const transaction = await createTransaction(account.id, "tx-update");
 
-      await expect(
-        prisma.ledgerTransaction.update({
+        await expect(
+          prisma.ledgerTransaction.update({
+            where: { id: transaction.id },
+            data: { causeKey: `${run}-renamed` },
+          }),
+        ).rejects.toThrow(/append-only/u);
+
+        const after = await prisma.ledgerTransaction.findUniqueOrThrow({
           where: { id: transaction.id },
-          data: { causeKey: `${run}-renamed` },
-        }),
-      ).rejects.toThrow(/append-only/u);
-
-      const after = await prisma.ledgerTransaction.findUniqueOrThrow({
-        where: { id: transaction.id },
-      });
-      expect(after.causeKey).toBe(transaction.causeKey);
-    });
-
-    it("refuses to delete a ledger transaction, and the transaction survives", async () => {
-      const account = await createAccount(AccountType.USER);
-      const transaction = await createTransaction(account.id, "tx-delete");
-
-      await expect(
-        prisma.ledgerTransaction.delete({ where: { id: transaction.id } }),
-      ).rejects.toThrow(/append-only/u);
-
-      expect(await prisma.ledgerTransaction.count({ where: { id: transaction.id } })).toBe(1);
-    });
-
-    it("allows only one treasury account", async () => {
-      const existing = await prisma.account.findFirst({ where: { type: AccountType.TREASURY } });
-      if (existing === null) {
-        await createAccount(AccountType.TREASURY);
-      }
-
-      await expect(createAccount(AccountType.TREASURY)).rejects.toThrow(/exactly one TREASURY/u);
-
-      expect(await prisma.account.count({ where: { type: AccountType.TREASURY } })).toBe(1);
-    });
-
-    it("refuses to turn a second account into the treasury", async () => {
-      const account = await createAccount(AccountType.USER);
-
-      await expect(
-        prisma.account.update({ where: { id: account.id }, data: { type: AccountType.TREASURY } }),
-      ).rejects.toThrow(/exactly one TREASURY/u);
-    });
-
-    it("stores an amount at full scale without rounding it", async () => {
-      const account = await createAccount(AccountType.USER);
-      // 18 decimal places: the most the ledger's NUMERIC(38, 18) can hold, and more than a
-      // double could carry without loss.
-      const amount = "0.123456789012345678";
-      const { entries } = await prisma.ledgerTransaction.create({
-        data: {
-          type: EntryType.DEPOSIT,
-          causeKey: `${run}-scale`,
-          entries: {
-            create: [
-              { accountId: account.id, currency: "USD", amount },
-              { accountId: account.id, currency: "USD", amount: `-${amount}` },
-            ],
-          },
-        },
-        include: { entries: true },
+        });
+        expect(after.causeKey).toBe(transaction.causeKey);
       });
 
-      const stored = entries.map((entry) => entry.amount.toString());
-      expect(stored).toContain(amount);
-      expect(stored).toContain(`-${amount}`);
+      it("refuses to delete a ledger transaction, and the transaction survives", async () => {
+        const account = await createAccount(AccountType.USER);
+        const transaction = await createTransaction(account.id, "tx-delete");
+
+        await expect(
+          prisma.ledgerTransaction.delete({ where: { id: transaction.id } }),
+        ).rejects.toThrow(/append-only/u);
+
+        expect(await prisma.ledgerTransaction.count({ where: { id: transaction.id } })).toBe(1);
+      });
     });
 
-    it("treats a repeated cause key as a conflict rather than a second transaction", async () => {
-      const account = await createAccount(AccountType.USER);
-      const causeKey = `${run}-duplicate`;
-      const write = async () =>
-        prisma.ledgerTransaction.create({
-          data: {
-            type: EntryType.DEPOSIT,
-            causeKey,
-            entries: {
-              create: [
-                { accountId: account.id, currency: "USD", amount: "1" },
-                { accountId: account.id, currency: "USD", amount: "-1" },
-              ],
+    describe("one treasury (accounts.md section 6)", () => {
+      it("allows only one treasury account", async () => {
+        const existing = await prisma.account.findFirst({ where: { type: AccountType.TREASURY } });
+        if (existing === null) {
+          await createAccount(AccountType.TREASURY);
+        }
+
+        await expect(createAccount(AccountType.TREASURY)).rejects.toThrow(/exactly one TREASURY/u);
+
+        expect(await prisma.account.count({ where: { type: AccountType.TREASURY } })).toBe(1);
+      });
+
+      it("refuses to turn a second account into the treasury", async () => {
+        const account = await createAccount(AccountType.USER);
+
+        await expect(
+          prisma.account.update({
+            where: { id: account.id },
+            data: { type: AccountType.TREASURY },
+          }),
+        ).rejects.toThrow(/exactly one TREASURY/u);
+      });
+
+      it("holds under two concurrent inserts", async () => {
+        // The check and the insert are not atomic on their own: under READ COMMITTED both
+        // transactions would see no treasury and both would commit. The advisory lock in the
+        // trigger is what stops that, and this is the test that would fail without it.
+        //
+        // Two clients, not two queries on one, because one client serialises its own work and
+        // the race would never happen.
+        const racers = [
+          createPrismaClient({ connectionString: databaseUrl ?? "" }),
+          createPrismaClient({ connectionString: databaseUrl ?? "" }),
+        ];
+
+        try {
+          await Promise.all(racers.map(async (client) => client.$connect()));
+
+          const results = await Promise.allSettled(
+            racers.map(async (client) =>
+              client.account.create({ data: { type: AccountType.TREASURY } }),
+            ),
+          );
+
+          const fulfilled = results.filter((result) => result.status === "fulfilled");
+          const rejected = results.filter((result) => result.status === "rejected");
+
+          // One of the two may lose to a treasury an earlier test created, in which case both
+          // are rejected. What must never happen is two treasuries existing.
+          expect(fulfilled.length).toBeLessThanOrEqual(1);
+          expect(rejected.length).toBeGreaterThanOrEqual(1);
+          for (const result of rejected) {
+            expect(String(result.reason)).toMatch(/exactly one TREASURY/u);
+          }
+
+          expect(await prisma.account.count({ where: { type: AccountType.TREASURY } })).toBe(1);
+        } finally {
+          await Promise.all(racers.map(async (client) => client.$disconnect()));
+        }
+      });
+    });
+
+    describe("what an entry may hold (ledger.md sections 2 and 7)", () => {
+      it("refuses a zero amount", async () => {
+        const account = await createAccount(AccountType.USER);
+
+        await expect(
+          prisma.ledgerTransaction.create({
+            data: {
+              type: EntryType.DEPOSIT,
+              causeKey: `${run}-zero`,
+              entries: {
+                create: [
+                  { accountId: account.id, currency: "USD", amount: "0" },
+                  { accountId: account.id, currency: "USD", amount: "0" },
+                ],
+              },
             },
+          }),
+        ).rejects.toThrow(/LedgerEntry_amount_not_zero/u);
+
+        expect(await prisma.ledgerTransaction.count({ where: { causeKey: `${run}-zero` } })).toBe(
+          0,
+        );
+      });
+
+      it("refuses a currency that is not a three or four letter uppercase code", async () => {
+        const account = await createAccount(AccountType.USER);
+
+        await expect(
+          prisma.ledgerTransaction.create({
+            data: {
+              type: EntryType.DEPOSIT,
+              causeKey: `${run}-currency`,
+              entries: {
+                create: [
+                  { accountId: account.id, currency: "usd", amount: "1" },
+                  { accountId: account.id, currency: "usd", amount: "-1" },
+                ],
+              },
+            },
+          }),
+        ).rejects.toThrow(/LedgerEntry_currency_format/u);
+
+        expect(
+          await prisma.ledgerTransaction.count({ where: { causeKey: `${run}-currency` } }),
+        ).toBe(0);
+      });
+
+      it("refuses a malformed currency on a hold", async () => {
+        const account = await createAccount(AccountType.USER);
+        const instrument = await prisma.instrument.create({
+          data: {
+            symbol: `BTC-${run.slice(-3).toUpperCase()}`,
+            baseCurrency: "BTC",
+            quoteCurrency: "USD",
+          },
+        });
+        const order = await prisma.order.create({
+          data: {
+            accountId: account.id,
+            instrumentId: instrument.id,
+            side: "BUY",
+            type: "LIMIT",
+            price: "100",
+            quantity: "1",
           },
         });
 
-      await write();
-      await expect(write()).rejects.toThrow();
+        await expect(
+          prisma.hold.create({
+            data: { accountId: account.id, orderId: order.id, currency: "DOLLARS", amount: "100" },
+          }),
+        ).rejects.toThrow(/Hold_currency_format/u);
 
-      expect(await prisma.ledgerTransaction.count({ where: { causeKey } })).toBe(1);
-    });
+        expect(await prisma.hold.count({ where: { orderId: order.id } })).toBe(0);
+      });
 
-    it("keeps every entry of a rejected transaction out of the ledger", async () => {
-      const account = await createAccount(AccountType.USER);
-      const causeKey = `${run}-atomic`;
-      const before = await prisma.ledgerEntry.count();
-
-      // The second entry names an account that does not exist, so the write fails partway.
-      await expect(
-        prisma.ledgerTransaction.create({
+      it("stores an amount at full scale without rounding it", async () => {
+        const account = await createAccount(AccountType.USER);
+        // 18 decimal places: the most the ledger's NUMERIC(38, 18) can hold, and more than a
+        // binary float could carry without loss.
+        const amount = "0.123456789012345678";
+        const { entries } = await prisma.ledgerTransaction.create({
           data: {
             type: EntryType.DEPOSIT,
-            causeKey,
+            causeKey: `${run}-scale`,
             entries: {
               create: [
-                { accountId: account.id, currency: "USD", amount: "5" },
-                {
-                  accountId: "00000000-0000-0000-0000-000000000000",
-                  currency: "USD",
-                  amount: "-5",
-                },
+                { accountId: account.id, currency: "USD", amount },
+                { accountId: account.id, currency: "USD", amount: `-${amount}` },
               ],
             },
           },
-        }),
-      ).rejects.toThrow();
+          include: { entries: true },
+        });
 
-      expect(await prisma.ledgerEntry.count()).toBe(before);
-      expect(await prisma.ledgerTransaction.count({ where: { causeKey } })).toBe(0);
+        const stored = entries.map((entry) => entry.amount.toString());
+        expect(stored).toContain(amount);
+        expect(stored).toContain(`-${amount}`);
+      });
+    });
+
+    describe("transactions (ledger.md section 3)", () => {
+      it("treats a repeated cause key as a conflict rather than a second transaction", async () => {
+        const account = await createAccount(AccountType.USER);
+        const causeKey = `${run}-duplicate`;
+        const write = async () =>
+          prisma.ledgerTransaction.create({
+            data: {
+              type: EntryType.DEPOSIT,
+              causeKey,
+              entries: {
+                create: [
+                  { accountId: account.id, currency: "USD", amount: "1" },
+                  { accountId: account.id, currency: "USD", amount: "-1" },
+                ],
+              },
+            },
+          });
+
+        await write();
+        await expect(write()).rejects.toThrow();
+
+        expect(await prisma.ledgerTransaction.count({ where: { causeKey } })).toBe(1);
+      });
+
+      it("keeps every entry of a rejected transaction out of the ledger", async () => {
+        const account = await createAccount(AccountType.USER);
+        const causeKey = `${run}-atomic`;
+        const before = await prisma.ledgerEntry.count();
+
+        // The second entry names an account that does not exist, so the write fails partway.
+        await expect(
+          prisma.ledgerTransaction.create({
+            data: {
+              type: EntryType.DEPOSIT,
+              causeKey,
+              entries: {
+                create: [
+                  { accountId: account.id, currency: "USD", amount: "5" },
+                  {
+                    accountId: "00000000-0000-0000-0000-000000000000",
+                    currency: "USD",
+                    amount: "-5",
+                  },
+                ],
+              },
+            },
+          }),
+        ).rejects.toThrow();
+
+        expect(await prisma.ledgerEntry.count()).toBe(before);
+        expect(await prisma.ledgerTransaction.count({ where: { causeKey } })).toBe(0);
+      });
+    });
+
+    describe("deletion fails loudly (accounts.md section 7, question 1)", () => {
+      it("refuses to delete a user that still has an account", async () => {
+        const user = await prisma.user.create({ data: { authSubject: `${run}-subject` } });
+        await prisma.account.create({ data: { type: AccountType.USER, userId: user.id } });
+
+        await expect(prisma.user.delete({ where: { id: user.id } })).rejects.toThrow();
+
+        expect(await prisma.user.count({ where: { id: user.id } })).toBe(1);
+      });
     });
   },
 );

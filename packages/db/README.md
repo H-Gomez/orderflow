@@ -69,16 +69,25 @@ module-level singleton: a caller owns its client and disconnects it.
 `pnpm --filter @orderflow/db test` runs two kinds of test:
 
 - Schema-shape tests, which read `schema.prisma` and the migration and need no database. They
-  are the ones that guard the precision and the absence of a balance column.
-- Database tests, which need the compose database and **skip when `DATABASE_URL` is unset**,
-  so the suite stays green on a machine without Docker. They prove the append-only triggers
-  and the single-treasury rule actually fire.
+  guard the precision, the absence of a balance column and the presence of the triggers.
+- Database tests, which prove the append-only triggers, the single-treasury rule and the
+  CHECK constraints actually fire.
 
-Run the second kind with the database up:
+The database tests never touch your dev database. Each run creates `orderflow_test_<run>` on
+the same server, migrates it, and drops it in teardown
+([src/testing/global-setup.ts](src/testing/global-setup.ts)). The ledger is append-only, so
+rows a test writes would otherwise stay forever, and the first test to create a treasury would
+take the only slot the rule allows.
+
+`DATABASE_URL` names the _server_ to create that database on; it falls back to the compose
+server, so with the container up this needs no configuration:
 
 ```sh
-pnpm db:up && pnpm db:migrate && pnpm --filter @orderflow/db test
+pnpm db:up && pnpm --filter @orderflow/db test
 ```
+
+When no server answers, the database tests skip and the suite stays green, which is what
+should happen on a machine without Docker.
 
 ## What this package does not do
 

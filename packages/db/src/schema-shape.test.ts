@@ -73,9 +73,34 @@ describe("append-only ledger (ledger.md section 4)", () => {
   });
 });
 
+describe("what an entry may hold (ledger.md sections 2 and 7)", () => {
+  it("forbids a zero amount and a malformed currency in the database", () => {
+    expect(migration).toMatch(/CHECK \("amount" <> 0\)/u);
+    expect(migration).toMatch(/"LedgerEntry_currency_format" CHECK/u);
+    expect(migration).toMatch(/"Hold_currency_format" CHECK/u);
+  });
+});
+
 describe("accounts (accounts.md sections 1 and 6)", () => {
   it("installs the single-treasury trigger", () => {
     expect(migration).toMatch(/CREATE TRIGGER "account_single_treasury"/u);
+  });
+
+  it("serialises treasury writers, so the check cannot be raced", () => {
+    // Without this the trigger is a read followed by a write under READ COMMITTED, and two
+    // concurrent inserts both pass. src/schema.test.ts proves it against a real database.
+    expect(migration).toMatch(/pg_advisory_xact_lock\(hashtext\('orderflow_single_treasury'\)\)/u);
+  });
+
+  it("refuses to orphan an account when a user is deleted", () => {
+    // accounts.md section 7 leaves deletion undecided, so it fails loudly rather than
+    // silently detaching the account from its user.
+    expect(migration).toMatch(
+      /"Account_userId_fkey" FOREIGN KEY \("userId"\) REFERENCES "User"\("id"\) ON DELETE RESTRICT/u,
+    );
+    expect(migration).toMatch(
+      /"LedgerTransaction_correctsTransactionId_fkey"[\s\S]{0,120}ON DELETE RESTRICT/u,
+    );
   });
 
   it("keeps currency off the account and account type off the entry", () => {

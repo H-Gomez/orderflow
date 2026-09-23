@@ -14,9 +14,6 @@
     "test": {
       "dependsOn": ["^build", "generate"]
     },
-    "db:migrate": {
-      "cache": false
-    },
     "generate": {
       "outputs": ["src/generated/**"]
     }

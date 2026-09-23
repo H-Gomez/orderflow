@@ -217,10 +217,10 @@ CREATE INDEX "Conversation_userId_createdAt_idx" ON "Conversation"("userId", "cr
 CREATE INDEX "Message_conversationId_createdAt_idx" ON "Message"("conversationId", "createdAt");
 
 -- AddForeignKey
-ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "LedgerTransaction" ADD CONSTRAINT "LedgerTransaction_correctsTransactionId_fkey" FOREIGN KEY ("correctsTransactionId") REFERENCES "LedgerTransaction"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "LedgerTransaction" ADD CONSTRAINT "LedgerTransaction_correctsTransactionId_fkey" FOREIGN KEY ("correctsTransactionId") REFERENCES "LedgerTransaction"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "LedgerEntry" ADD CONSTRAINT "LedgerEntry_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "LedgerTransaction"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -259,6 +259,18 @@ ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_userId_fkey" FOREIGN KEY
 ALTER TABLE "Message" ADD CONSTRAINT "Message_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 
+-- Rules the domain docs state that a column type cannot (docs/domain/ledger.md sections 2
+-- and 7).
+--
+-- An amount is never zero: "A zero entry can only come from a bug, such as a fill or seed
+-- that computed to nothing, and rejecting it makes that bug loud at write time instead of
+-- silent and permanent." A currency is its uppercase ticker of three or four letters, and
+-- the code is the identity, so anything else is a typo that would split an account's holding
+-- in two.
+ALTER TABLE "LedgerEntry" ADD CONSTRAINT "LedgerEntry_amount_not_zero" CHECK ("amount" <> 0);
+ALTER TABLE "LedgerEntry" ADD CONSTRAINT "LedgerEntry_currency_format" CHECK ("currency" ~ '^[A-Z]{3,4}$');
+ALTER TABLE "Hold" ADD CONSTRAINT "Hold_currency_format" CHECK ("currency" ~ '^[A-Z]{3,4}$');
+
 -- Append-only ledger (docs/domain/ledger.md section 4).
 --
 -- "No entry is ever updated or deleted: not by the application, not by a migration, not by an
@@ -288,13 +300,25 @@ CREATE TRIGGER "ledger_transaction_append_only"
 -- currency. A trigger rather than a partial unique index: since 7.4 Prisma reports an index
 -- it cannot express in the schema as drift and proposes dropping it, which would fail this
 -- story's no-drift check. A trigger is invisible to `prisma migrate diff` and just as binding.
+--
+-- The advisory lock is what makes the check true rather than merely likely. Under READ
+-- COMMITTED two concurrent inserts each run the EXISTS query against a snapshot taken before
+-- the other committed, so both see no treasury and both succeed. The lock serialises treasury
+-- writers: the second waits for the first to commit, then sees its row. It is transaction
+-- scoped, so it is released at COMMIT or ROLLBACK with no unlock to forget, and it is taken
+-- only for a treasury write, so ordinary account inserts never queue behind it.
 CREATE OR REPLACE FUNCTION "orderflow_account_single_treasury"() RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW."type" = 'TREASURY' AND EXISTS (
-        SELECT 1 FROM "Account" WHERE "type" = 'TREASURY' AND "id" <> NEW."id"
-    ) THEN
-        RAISE EXCEPTION 'there is exactly one TREASURY account';
+    IF NEW."type" = 'TREASURY' THEN
+        PERFORM pg_advisory_xact_lock(hashtext('orderflow_single_treasury'));
+
+        IF EXISTS (
+            SELECT 1 FROM "Account" WHERE "type" = 'TREASURY' AND "id" <> NEW."id"
+        ) THEN
+            RAISE EXCEPTION 'there is exactly one TREASURY account';
+        END IF;
     END IF;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
