@@ -88,6 +88,10 @@ export const setup = async (): Promise<void> => {
   });
 
   if (migrate.status !== 0) {
+    // Teardown does not run when setup throws, so this database would sit on the server
+    // forever, one per failed run. It is dropped here instead, and the migration error is
+    // what reaches the caller.
+    await teardown();
     throw new Error(`could not migrate the test database:\n${migrate.stderr || migrate.stdout}`);
   }
 

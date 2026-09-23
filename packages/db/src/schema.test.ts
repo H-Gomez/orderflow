@@ -131,40 +131,53 @@ describe.skipIf(databaseUrl === undefined || databaseUrl === "")(
       });
 
       it("holds under two concurrent inserts", async () => {
-        // The check and the insert are not atomic on their own: under READ COMMITTED both
-        // transactions would see no treasury and both would commit. The advisory lock in the
-        // trigger is what stops that, and this is the test that would fail without it.
+        // The trigger reads then writes, and those are not one atomic step. Under READ
+        // COMMITTED, B's EXISTS query cannot see A's uncommitted row, so without the advisory
+        // lock both transactions find no treasury and both commit. With it, B waits for A to
+        // commit, then sees A's row and raises.
         //
-        // Two clients, not two queries on one, because one client serialises its own work and
-        // the race would never happen.
-        const racers = [
+        // The timing is what makes this deterministic rather than a hopeful race: A inserts
+        // and holds its transaction open, B starts while A is still uncommitted. It also has
+        // to start from no treasury at all, or the EXISTS check alone rejects both and the
+        // test passes whether or not the lock is there.
+        await prisma.account.deleteMany({ where: { type: AccountType.TREASURY } });
+        expect(await prisma.account.count({ where: { type: AccountType.TREASURY } })).toBe(0);
+
+        const sleep = async (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+        const HOLD_OPEN_MS = 300;
+        const START_LATE_MS = 50;
+
+        const [clientA, clientB] = [
           createPrismaClient({ connectionString: databaseUrl ?? "" }),
           createPrismaClient({ connectionString: databaseUrl ?? "" }),
         ];
 
         try {
-          await Promise.all(racers.map(async (client) => client.$connect()));
+          await Promise.all([clientA.$connect(), clientB.$connect()]);
 
-          const results = await Promise.allSettled(
-            racers.map(async (client) =>
-              client.account.create({ data: { type: AccountType.TREASURY } }),
-            ),
-          );
+          const results = await Promise.allSettled([
+            // A: insert, stay open long enough for B to arrive, then commit.
+            clientA.$transaction(async (tx) => {
+              await tx.account.create({ data: { type: AccountType.TREASURY } });
+              await sleep(HOLD_OPEN_MS);
+            }),
+            // B: arrive while A is still uncommitted, then insert.
+            clientB.$transaction(async (tx) => {
+              await sleep(START_LATE_MS);
+              await tx.account.create({ data: { type: AccountType.TREASURY } });
+            }),
+          ]);
 
           const fulfilled = results.filter((result) => result.status === "fulfilled");
           const rejected = results.filter((result) => result.status === "rejected");
 
-          // One of the two may lose to a treasury an earlier test created, in which case both
-          // are rejected. What must never happen is two treasuries existing.
-          expect(fulfilled.length).toBeLessThanOrEqual(1);
-          expect(rejected.length).toBeGreaterThanOrEqual(1);
-          for (const result of rejected) {
-            expect(String(result.reason)).toMatch(/exactly one TREASURY/u);
-          }
+          expect(fulfilled).toHaveLength(1);
+          expect(rejected).toHaveLength(1);
+          expect(String(rejected[0]?.reason)).toMatch(/exactly one TREASURY/u);
 
           expect(await prisma.account.count({ where: { type: AccountType.TREASURY } })).toBe(1);
         } finally {
-          await Promise.all(racers.map(async (client) => client.$disconnect()));
+          await Promise.all([clientA.$disconnect(), clientB.$disconnect()]);
         }
       });
     });
