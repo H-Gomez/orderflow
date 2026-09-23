@@ -3,3 +3,7 @@ packages:
   - services/*
   - packages/*
   - .claude/hooks
+
+allowBuilds:
+  "@prisma/engines": false
+  prisma: false

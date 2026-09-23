@@ -1,0 +1,29 @@
+# Local development database. Nothing here is a secret: the credentials are fixed
+# development values, and the port is bound to localhost only.
+#
+# Port 55432 rather than 5432, so this never collides with a Postgres already running on the
+# machine. The image is pgvector's, so STORY-014 (#14) can add the extension and its embedding
+# table without a second database.
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: orderflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orderflow
+      POSTGRES_PASSWORD: orderflow
+      POSTGRES_DB: orderflow
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      # Postgres 18 images want the mount one level up, at /var/lib/postgresql, and keep the
+      # cluster in a version-named subdirectory so a later pg_upgrade --link works.
+      - orderflow-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderflow -d orderflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  orderflow-postgres-data:
