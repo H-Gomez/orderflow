@@ -83,11 +83,18 @@ take the only slot the rule allows.
 server, so with the container up this needs no configuration:
 
 ```sh
-pnpm db:up && pnpm --filter @orderflow/db test
+pnpm db:up && pnpm --filter @orderflow/db test   # this package only
+pnpm db:up && pnpm test                          # the whole repo, as CI runs it
 ```
 
+Both honour `DATABASE_URL`. The root command goes through Turbo, which runs in strict env mode
+and passes a variable to a task only when `turbo.json` names it, so the `test` task declares
+`CI` and `DATABASE_URL` there. A variable this package reads from a developer's shell has to be
+added to that list or the root command will not see it.
+
 When no server answers, the database tests skip and the suite stays green, which is what
-should happen on a machine without Docker.
+should happen on a machine without Docker. Under `CI` they fail instead, so a pipeline with no
+database cannot pass by doing nothing ([src/testing/database-guard.ts](src/testing/database-guard.ts)).
 
 ## What this package does not do
 
