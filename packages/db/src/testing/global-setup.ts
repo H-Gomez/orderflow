@@ -44,6 +44,18 @@ const quoteIdentifier = (name: string): string => {
   return `"${name}"`;
 };
 
+/**
+ * The Postgres server the tests should use: `DATABASE_URL`, or the compose server.
+ *
+ * An empty `DATABASE_URL` means the same as an unset one. A workflow that sets the variable
+ * conditionally leaves it empty on the legs that do not want it, and `??` alone would take
+ * that empty string as the server URL and fail to connect to nothing.
+ */
+export const serverUrlFrom = (env: NodeJS.ProcessEnv): string => {
+  const configured = env["DATABASE_URL"];
+  return configured === undefined || configured === "" ? LOCAL_SERVER_URL : configured;
+};
+
 const withDatabase = (serverUrl: string, database: string): string => {
   const url = new URL(serverUrl);
   url.pathname = `/${database}`;
@@ -66,7 +78,7 @@ const connectToServer = async (serverUrl: string): Promise<Client | null> => {
 };
 
 export const setup = async (): Promise<void> => {
-  const serverUrl = process.env["DATABASE_URL"] ?? LOCAL_SERVER_URL;
+  const serverUrl = serverUrlFrom(process.env);
   admin = await connectToServer(serverUrl);
 
   if (admin === null) {

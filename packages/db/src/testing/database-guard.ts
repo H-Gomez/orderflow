@@ -17,10 +17,10 @@
 /** Where `global-setup.ts` leaves the URL of the database it made for this run. */
 const TEST_DATABASE_URL = "ORDERFLOW_TEST_DATABASE_URL";
 
-/** GitHub Actions and most CI providers set `CI=true`; `false` or empty means not CI. */
+/** GitHub Actions and most CI providers set `CI=true`; empty, `false` or `0` means not CI. */
 const isCi = (env: NodeJS.ProcessEnv): boolean => {
-  const ci = env["CI"];
-  return ci !== undefined && ci !== "" && ci.toLowerCase() !== "false";
+  const ci = env["CI"]?.toLowerCase();
+  return ci !== undefined && ci !== "" && ci !== "false" && ci !== "0";
 };
 
 /**

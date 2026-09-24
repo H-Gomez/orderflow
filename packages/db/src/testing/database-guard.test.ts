@@ -18,9 +18,11 @@ describe("testDatabaseUrl", () => {
     expect(testDatabaseUrl({})).toBeUndefined();
   });
 
-  it("skips when CI is empty or false", () => {
+  it("skips when CI is empty, false or zero", () => {
     expect(testDatabaseUrl({ CI: "" })).toBeUndefined();
     expect(testDatabaseUrl({ CI: "false" })).toBeUndefined();
+    expect(testDatabaseUrl({ CI: "FALSE" })).toBeUndefined();
+    expect(testDatabaseUrl({ CI: "0" })).toBeUndefined();
   });
 
   it("treats an empty test database URL as absent", () => {
