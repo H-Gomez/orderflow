@@ -15,53 +15,53 @@ concurrency:
 
 jobs:
   check:
-  # One check per stage so the PR page shows CI / typecheck, CI / lint,
-  # CI / format:check, CI / test and CI / build as separate lines. The
-  # ruleset's required status checks must list these five names, not "checks".
-  name: ${{ matrix.check }}
-  runs-on: ubuntu-latest
-  timeout-minutes: 15
-  strategy:
-    fail-fast: false
-    matrix:
-      check: [typecheck, lint, "format:check", test, build]
-  # Same image and development credentials as docker-compose.yml. A service
-  # cannot be scoped to one matrix leg, so it starts on every leg; only the
-  # test leg is given DATABASE_URL, so only the test leg uses it.
-  services:
-    postgres:
-      image: pgvector/pgvector:pg18
-      env:
-        POSTGRES_USER: orderflow
-        POSTGRES_PASSWORD: orderflow
-        POSTGRES_DB: orderflow
-      ports: ["5432:5432"]
-      options: >-
-        --health-cmd "pg_isready -U orderflow -d orderflow"
-        --health-interval 5s --health-timeout 5s --health-retries 20
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v5
+    # One check per stage so the PR page shows CI / typecheck, CI / lint,
+    # CI / format:check, CI / test and CI / build as separate lines. The
+    # ruleset's required status checks must list these five names, not "checks".
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [typecheck, lint, "format:check", test, build]
+    # Same image and development credentials as docker-compose.yml. A service
+    # cannot be scoped to one matrix leg, so it starts on every leg; only the
+    # test leg is given DATABASE_URL, so only the test leg uses it.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: orderflow
+          POSTGRES_PASSWORD: orderflow
+          POSTGRES_DB: orderflow
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U orderflow -d orderflow"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
 
-    - name: Enable corepack
-      run: corepack enable pnpm
+      - name: Enable corepack
+        run: corepack enable pnpm
 
-    - name: Set up Node
-      uses: actions/setup-node@v5
-      with:
-        node-version-file: .nvmrc
-        cache: pnpm
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
 
-    - name: Install
-      run: pnpm install --frozen-lockfile
+      - name: Install
+        run: pnpm install --frozen-lockfile
 
-    - name: Apply migrations
-      if: matrix.check == 'test'
-      env:
-        DATABASE_URL: postgresql://orderflow:orderflow@localhost:5432/orderflow
-      run: pnpm db:migrate
+      - name: Apply migrations
+        if: matrix.check == 'test'
+        env:
+          DATABASE_URL: postgresql://orderflow:orderflow@localhost:5432/orderflow
+        run: pnpm db:migrate
 
-    - name: Run ${{ matrix.check }}
-      env:
-        DATABASE_URL: ${{ matrix.check == 'test' && 'postgresql://orderflow:orderflow@localhost:5432/orderflow' || '' }}
-      run: pnpm ${{ matrix.check }}
+      - name: Run ${{ matrix.check }}
+        env:
+          DATABASE_URL: ${{ matrix.check == 'test' && 'postgresql://orderflow:orderflow@localhost:5432/orderflow' || '' }}
+        run: pnpm ${{ matrix.check }}
