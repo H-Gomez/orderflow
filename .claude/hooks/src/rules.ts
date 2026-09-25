@@ -27,7 +27,15 @@ export interface PathRule extends RuleBase {
   readonly matches: (relativePath: string, baseName: string) => boolean;
 }
 
-export type Rule = BashRule | PathRule;
+export interface ContentRule extends RuleBase {
+  readonly kind: "content";
+  /** @param baseName lowercased file name */
+  readonly appliesTo: (baseName: string) => boolean;
+  /** Tested against the text the tool call is about to write, as given. Must not use the `g` flag. */
+  readonly pattern: RegExp;
+}
+
+export type Rule = BashRule | PathRule | ContentRule;
 
 const isUnder = (relativePath: string, dir: string): boolean =>
   relativePath === dir || relativePath.startsWith(`${dir}/`);
@@ -91,5 +99,16 @@ export const pathRules: readonly PathRule[] = [
     id: "claude-hooks",
     reason: "The guardrail hooks are human-authored. Agents may not edit them.",
     matches: (relativePath) => isUnder(relativePath, ".claude/hooks"),
+  },
+];
+
+export const contentRules: readonly ContentRule[] = [
+  {
+    kind: "content",
+    id: "sql-destructive-statement",
+    reason:
+      "Destructive SQL needs a human's approval (CLAUDE.md: destructive operations such as `DROP TABLE`).",
+    appliesTo: (baseName) => baseName.endsWith(".sql"),
+    pattern: /\b(?:drop\s+(?:table|schema|database|index|column)|truncate|delete\s+from)\b/i,
   },
 ];
