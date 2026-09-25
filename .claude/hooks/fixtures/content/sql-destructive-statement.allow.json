@@ -1,0 +1,10 @@
+{
+  "session_id": "fixture",
+  "cwd": "/repo",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "/repo/packages/db/prisma/migrations/20260925000000_add_fee/migration.sql",
+    "content": "CREATE TABLE \"Fee\" (\n    \"id\" UUID NOT NULL,\n    \"amount\" NUMERIC(38, 18) NOT NULL,\n    CONSTRAINT \"Fee_pkey\" PRIMARY KEY (\"id\")\n);\n\nCREATE OR REPLACE FUNCTION \"orderflow_ledger_is_append_only\"() RETURNS TRIGGER AS $$\nBEGIN\n    RAISE EXCEPTION 'ledger is append-only: % on % is forbidden', TG_OP, TG_TABLE_NAME;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE OR REPLACE TRIGGER \"ledger_entry_append_only\"\n    BEFORE UPDATE OR DELETE ON \"LedgerEntry\"\n    FOR EACH ROW EXECUTE FUNCTION \"orderflow_ledger_is_append_only\"();\n\nALTER TABLE \"Account\" ADD CONSTRAINT \"Account_fk\" FOREIGN KEY (\"userId\") REFERENCES \"User\"(\"id\") ON DELETE CASCADE;\n"
+  }
+}

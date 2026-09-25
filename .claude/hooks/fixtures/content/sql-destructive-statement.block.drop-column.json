@@ -1,0 +1,10 @@
+{
+  "session_id": "fixture",
+  "cwd": "/repo",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "/repo/packages/db/prisma/migrations/20260925000000_slim/migration.sql",
+    "content": "ALTER TABLE \"LedgerEntry\" DROP COLUMN \"memo\";\n"
+  }
+}

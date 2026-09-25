@@ -1,0 +1,11 @@
+{
+  "session_id": "fixture",
+  "cwd": "/repo",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "/repo/scripts/reset.SQL",
+    "old_string": "SELECT 1;",
+    "new_string": "truncate \"Order\";"
+  }
+}
