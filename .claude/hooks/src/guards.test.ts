@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { BLOCK_EXIT_CODE } from "./hook-io.ts";
-import { bashRules, pathRules } from "./rules.ts";
+import { bashRules, contentRules, pathRules } from "./rules.ts";
 import type { Rule } from "./rules.ts";
 
 const FIXTURES = path.join(import.meta.dirname, "..", "fixtures");
@@ -31,6 +31,7 @@ interface GuardSuite {
 const suites: readonly GuardSuite[] = [
   { script: "guard-bash.ts", fixtureDir: "bash", rules: bashRules },
   { script: "guard-paths.ts", fixtureDir: "paths", rules: pathRules },
+  { script: "guard-content.ts", fixtureDir: "content", rules: contentRules },
 ];
 
 describe.each(suites)("$script", ({ script, fixtureDir, rules }) => {
