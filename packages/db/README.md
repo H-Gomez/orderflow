@@ -61,8 +61,11 @@ const prisma = createPrismaClient(); // reads DATABASE_URL
 const treasury = await prisma.account.findFirst({ where: { type: AccountType.TREASURY } });
 ```
 
-Prisma 7 requires a driver adapter, which `createPrismaClient` wires up. There is no
-module-level singleton: a caller owns its client and disconnects it.
+Prisma 7 requires a driver adapter, which `createPrismaClient` wires up. 
+
+There is no module level singleton: a caller owns its client and disconnects it.
+
+A shared client would be built once, at import time, from whatever DATABASE_URL was set then. Each caller building its own lets a test point its client at that run's test database, and no test inherits another's open connection.
 
 ## Tests
 
