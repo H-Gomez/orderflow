@@ -62,6 +62,4 @@ jobs:
         run: pnpm db:migrate
 
       - name: Run ${{ matrix.check }}
-        env:
-          DATABASE_URL: ${{ matrix.check == 'test' && 'postgresql://orderflow:orderflow@localhost:5432/orderflow' || '' }}
         run: pnpm ${{ matrix.check }}
