@@ -61,7 +61,7 @@ const prisma = createPrismaClient(); // reads DATABASE_URL
 const treasury = await prisma.account.findFirst({ where: { type: AccountType.TREASURY } });
 ```
 
-Prisma 7 requires a driver adapter, which `createPrismaClient` wires up. 
+Prisma 7 requires a driver adapter, which `createPrismaClient` wires up.
 
 There is no module level singleton: a caller owns its client and disconnects it.
 
