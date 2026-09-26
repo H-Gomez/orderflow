@@ -12,7 +12,16 @@
       "dependsOn": ["^build", "generate"]
     },
     "test": {
-      "dependsOn": ["^build", "generate"]
+      "dependsOn": ["^build", "generate"],
+      // Turbo runs in strict env mode, so a variable not named here never reaches the task.
+      // The database tests read DATABASE_URL to find a server and CI to decide whether an
+      // absent one is a skip or a failure; without both, CI would set them and Vitest would
+      // never see them. Naming them here also puts them in the cache key, so a green run
+      // with no database cannot be replayed as a pass for a run that had one: Turbo does not
+      // hash CI on its own, and without it the two runs hash identically. The cost is that a
+      // local run and a CI run never share a cached `test`, which matters only if remote
+      // caching is ever turned on.
+      "env": ["CI", "DATABASE_URL"]
     },
     "generate": {
       "outputs": ["src/generated/**"]
