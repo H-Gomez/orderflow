@@ -12,7 +12,12 @@ import {
   type AmountInput,
   type ExactDecimal,
 } from "./money.js";
-import { inTransaction, ownsTransaction, type LedgerDb } from "./transaction.js";
+import {
+  assertReadCommitted,
+  inTransaction,
+  ownsTransaction,
+  type LedgerDb,
+} from "./transaction.js";
 
 /** One account's holding of one currency changing by a signed amount (ledger.md section 2). */
 export interface LedgerEntryInput {
@@ -222,14 +227,18 @@ const write = async (
   input: PostTransactionInput,
   entries: readonly ExactEntry[],
 ): Promise<PostedTransaction> => {
+  await assertReadCommitted(tx);
   await lockCause(tx, input.causeKey);
   const types = await accountTypes(tx, entries);
-  assertShape(input.type, entries, types);
 
+  // Before the shape rules, so a re-post under a different type is reported as the conflict it
+  // is rather than as whichever shape rule the new type happens to break.
   const replay = await findReplay(tx, input, entries);
   if (replay !== null) {
     return replay;
   }
+
+  assertShape(input.type, entries, types);
 
   await assertBuyingPower(tx, entries, types);
 

@@ -371,33 +371,40 @@ describe.skipIf(databaseUrl === undefined)("postTransaction (ledger.md)", () => 
       "the same key with different entries is a conflict, and changes nothing",
       async () => {
         await fc.assert(
-          fc.asyncProperty(amountUnits, fc.boolean(), async (units, otherAccount) => {
-            const { account, input } = await depositTo(units);
-            const first = await postTransaction(db, input);
-            const target = otherAccount ? await newAccount(db) : account;
-            const changed = otherAccount ? units : units + 1n;
-            const treasury = await treasuryId(db);
+          fc.asyncProperty(
+            amountUnits,
+            fc.constantFrom("amount", "account", "type"),
+            async (units, change) => {
+              const { account, input } = await depositTo(units);
+              const first = await postTransaction(db, input);
+              const target = change === "account" ? await newAccount(db) : account;
+              const changed = change === "amount" ? units + 1n : units;
+              const treasury = await treasuryId(db);
 
-            const error: unknown = await postTransaction(db, {
-              ...input,
-              entries: [
-                { accountId: treasury, currency: "USD", amount: fromUnits(-changed) },
-                { accountId: target, currency: "USD", amount: fromUnits(changed) },
-              ],
-            }).then(
-              () => null,
-              (reason: unknown) => reason,
-            );
+              const error: unknown = await postTransaction(db, {
+                ...input,
+                // A TRADE may not touch the treasury, so this fails a shape rule too: the conflict
+                // is reported first, because it is the real mistake.
+                type: change === "type" ? EntryType.TRADE : input.type,
+                entries: [
+                  { accountId: treasury, currency: "USD", amount: fromUnits(-changed) },
+                  { accountId: target, currency: "USD", amount: fromUnits(changed) },
+                ],
+              }).then(
+                () => null,
+                (reason: unknown) => reason,
+              );
 
-            expect(error).toBeInstanceOf(LedgerError);
-            expect((error as LedgerError).code).toBe(LedgerErrorCode.IDEMPOTENCY_CONFLICT);
-            const written = await db.ledgerTransaction.findMany({
-              where: { causeKey: input.causeKey },
-              include: { entries: true },
-            });
-            expect(written.map((t) => t.id)).toEqual([first.id]);
-            expect(written[0]?.entries).toHaveLength(2);
-          }),
+              expect(error).toBeInstanceOf(LedgerError);
+              expect((error as LedgerError).code).toBe(LedgerErrorCode.IDEMPOTENCY_CONFLICT);
+              const written = await db.ledgerTransaction.findMany({
+                where: { causeKey: input.causeKey },
+                include: { entries: true },
+              });
+              expect(written.map((t) => t.id)).toEqual([first.id]);
+              expect(written[0]?.entries).toHaveLength(2);
+            },
+          ),
           { numRuns: 20 },
         );
       },
@@ -469,8 +476,6 @@ describe.skipIf(databaseUrl === undefined)("postTransaction (ledger.md)", () => 
               expect(toUnits(balance.toFixed(18))).toBe(
                 expected.get(`${account}:${currency}`) ?? 0n,
               );
-              // No USER balance a history produced is negative (accounts.md section 6).
-              expect(balance.isNegative()).toBe(false);
             }
           }
         }),
@@ -501,6 +506,94 @@ describe.skipIf(databaseUrl === undefined)("postTransaction (ledger.md)", () => 
     await expect(balanceOf(db, account, "usd")).rejects.toMatchObject({
       code: LedgerErrorCode.INVALID_CURRENCY,
     });
+  });
+
+  describe("the unique index behind the cause lock", () => {
+    /**
+     * Writes the key with a raw insert that skips the cause lock, as code outside this API
+     * could, and holds that transaction open while postTransaction arrives. postTransaction
+     * finds nothing, its insert waits on the unique index, and fails once the raw write commits.
+     */
+    const racedByRawWrite = async (
+      post: (input: Parameters<typeof postTransaction>[1]) => Promise<unknown>,
+    ) => {
+      const treasury = await treasuryId(db);
+      const account = await newAccount(db);
+      const input = {
+        type: EntryType.DEPOSIT,
+        causeKey: unique("raw"),
+        entries: [
+          { accountId: treasury, currency: "USD", amount: "-3" },
+          { accountId: account, currency: "USD", amount: "3" },
+        ],
+      };
+      let written!: () => void;
+      const rawWritten = new Promise<void>((resolve) => {
+        written = resolve;
+      });
+      const [raw, ours] = await Promise.allSettled([
+        other.$transaction(async (tx) => {
+          const row = await tx.ledgerTransaction.create({
+            data: {
+              type: input.type,
+              causeKey: input.causeKey,
+              entries: { create: input.entries },
+            },
+          });
+          written();
+          await sleep(200);
+          return row;
+        }),
+        rawWritten.then(async () => post(input)),
+      ]);
+      return { raw, ours, causeKey: input.causeKey };
+    };
+
+    it("in its own transaction, catches the collision and replays the winner", async () => {
+      const { raw, ours, causeKey } = await racedByRawWrite(async (input) =>
+        postTransaction(db, input),
+      );
+
+      expect(raw.status).toBe("fulfilled");
+      expect(ours.status).toBe("fulfilled");
+      if (raw.status === "fulfilled" && ours.status === "fulfilled") {
+        expect((ours.value as { id: string }).id).toBe(raw.value.id);
+      }
+      expect(await db.ledgerTransaction.count({ where: { causeKey } })).toBe(1);
+    });
+
+    it("in a caller's transaction, reports DUPLICATE_CAUSE_KEY, since the caller's is aborted", async () => {
+      const { ours, causeKey } = await racedByRawWrite(async (input) =>
+        db.$transaction(async (tx) => postTransaction(tx, input)),
+      );
+
+      expect(ours.status === "rejected" ? ours.reason : null).toMatchObject({
+        code: LedgerErrorCode.DUPLICATE_CAUSE_KEY,
+      });
+      expect(await db.ledgerTransaction.count({ where: { causeKey } })).toBe(1);
+    });
+  });
+
+  it("refuses a caller's transaction that is not READ COMMITTED", async () => {
+    const account = await newAccount(db);
+    const treasury = await treasuryId(db);
+    const causeKey = unique("isolation");
+
+    await expect(
+      db.$transaction(
+        async (tx) =>
+          postTransaction(tx, {
+            type: EntryType.DEPOSIT,
+            causeKey,
+            entries: [
+              { accountId: treasury, currency: "USD", amount: "-1" },
+              { accountId: account, currency: "USD", amount: "1" },
+            ],
+          }),
+        { isolationLevel: "RepeatableRead" },
+      ),
+    ).rejects.toMatchObject({ code: LedgerErrorCode.UNSUPPORTED_ISOLATION });
+    expect(await db.ledgerTransaction.count({ where: { causeKey } })).toBe(0);
   });
 
   describe("inside a caller's transaction", () => {

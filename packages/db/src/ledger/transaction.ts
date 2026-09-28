@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 
+import { LedgerError, LedgerErrorCode } from "./errors.js";
+
 /**
  * What every ledger function takes: a client, or the transaction client a caller is already
  * inside.
@@ -32,3 +34,22 @@ export const inTransaction = async <T>(
   db: LedgerDb,
   work: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> => (ownsTransaction(db) ? db.$transaction(work, TRANSACTION_OPTIONS) : work(db));
+
+/**
+ * The locks in this module serialise writers, and a writer that waited then has to read what
+ * the one before it committed. Under READ COMMITTED each statement sees the latest commits, so
+ * it does. Under REPEATABLE READ or SERIALIZABLE the waiter keeps the snapshot it took before
+ * waiting, reads a buying power that misses the other writer's hold or debit, and the same money
+ * is spent twice. A transaction this package opens is READ COMMITTED, Postgres's default; a
+ * caller's may not be, so it is checked.
+ */
+export const assertReadCommitted = async (tx: Prisma.TransactionClient): Promise<void> => {
+  const [row] = await tx.$queryRaw<{ level: string }[]>`
+    SELECT current_setting('transaction_isolation') AS level`;
+  if (row?.level !== "read committed") {
+    throw new LedgerError(
+      LedgerErrorCode.UNSUPPORTED_ISOLATION,
+      `the ledger's locks need READ COMMITTED, and this transaction is ${row?.level ?? "unknown"} (accounts.md section 4.3)`,
+    );
+  }
+};

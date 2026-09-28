@@ -29,6 +29,12 @@ export const LedgerErrorCode = {
   INSUFFICIENT_BUYING_POWER: "INSUFFICIENT_BUYING_POWER",
   /** accounts.md section 4.1: a hold holds a positive amount. */
   NON_POSITIVE_HOLD: "NON_POSITIVE_HOLD",
+  /** accounts.md section 4.3: the hold's order does not exist or is another account's. */
+  ORDER_NOT_FOUND: "ORDER_NOT_FOUND",
+  /** accounts.md section 4.2: an order has one hold; a re-placed order is a new order. */
+  HOLD_EXISTS: "HOLD_EXISTS",
+  /** accounts.md section 4.3: the locks that serialise writers need READ COMMITTED. */
+  UNSUPPORTED_ISOLATION: "UNSUPPORTED_ISOLATION",
   /** accounts.md section 5: the treasury places no orders and has no buying power. */
   TREASURY_HAS_NO_BUYING_POWER: "TREASURY_HAS_NO_BUYING_POWER",
 } as const;

@@ -5,7 +5,7 @@ import { accountTypeOf, buyingPowerIn } from "./balances.js";
 import { LedgerError, LedgerErrorCode } from "./errors.js";
 import { lockBuyingPower } from "./locks.js";
 import { assertCurrency, toExact, type AmountInput } from "./money.js";
-import { inTransaction, type LedgerDb } from "./transaction.js";
+import { assertReadCommitted, inTransaction, type LedgerDb } from "./transaction.js";
 
 export interface PlaceHoldInput {
   readonly accountId: string;
@@ -23,8 +23,9 @@ export interface PlaceHoldInput {
  *
  * The check and the insert are serialised per account and currency by the same advisory lock
  * `postTransaction` takes on a debit, so neither two holds nor a hold and a debit can both
- * spend the same money. Rejects a hold over buying power, a hold of zero or less, and the
- * treasury, which has no buying power (section 5).
+ * spend the same money. Rejects a hold over buying power, a hold of zero or less, an order that
+ * is not the account's or already has a hold, and the treasury, which has no buying power
+ * (section 5).
  *
  * Given a client it runs in its own transaction, and a rejection leaves the caller's order row
  * alone. Given a transaction client it runs inside the caller's, so an order and its hold
@@ -41,6 +42,7 @@ export const placeHold = async (db: LedgerDb, input: PlaceHoldInput): Promise<Ho
   }
 
   return inTransaction(db, async (tx) => {
+    await assertReadCommitted(tx);
     if ((await accountTypeOf(tx, input.accountId)) === AccountType.TREASURY) {
       throw new LedgerError(
         LedgerErrorCode.TREASURY_HAS_NO_BUYING_POWER,
@@ -49,6 +51,23 @@ export const placeHold = async (db: LedgerDb, input: PlaceHoldInput): Promise<Ho
     }
 
     await lockBuyingPower(tx, [{ accountId: input.accountId, currency }]);
+
+    const order = await tx.order.findUnique({
+      where: { id: input.orderId },
+      select: { accountId: true, hold: { select: { id: true } } },
+    });
+    if (order?.accountId !== input.accountId) {
+      throw new LedgerError(
+        LedgerErrorCode.ORDER_NOT_FOUND,
+        `account ${input.accountId} has no order ${input.orderId} (accounts.md section 4.3)`,
+      );
+    }
+    if (order.hold !== null) {
+      throw new LedgerError(
+        LedgerErrorCode.HOLD_EXISTS,
+        `order ${input.orderId} already has a hold; a re-placed order is a new order (accounts.md section 4.2)`,
+      );
+    }
 
     const available = await buyingPowerIn(tx, input.accountId, currency);
     if (amount.gt(available)) {

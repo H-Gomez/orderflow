@@ -155,8 +155,7 @@ Every function takes `db`, either a client or the transaction client you are alr
   an order and its hold are accepted together or not at all. A rejection rolls your work back
   too.
 
-Caller mode assumes the default READ COMMITTED isolation. At a stricter level, a concurrent
-post of the same cause key surfaces as `DUPLICATE_CAUSE_KEY` rather than as a replay.
+Caller mode needs READ COMMITTED, Postgres's default, and rejects anything stricter with `UNSUPPORTED_ISOLATION`. Under REPEATABLE READ a writer that waited on a lock would still read its old snapshot, miss the other writer's hold or debit, and spend the same money twice.
 
 ### What `postTransaction` enforces
 
@@ -185,10 +184,16 @@ replays the first.
 A balance is derived, so there is no row to lock, and a check-then-write under READ COMMITTED
 races. `placeHold` and every debit in `postTransaction` take a transaction-scoped advisory lock
 on the account and currency before they check buying power. The second writer waits for the
-first to commit, then sees its hold or debit, so no two can spend the same money. Locks are
-taken in sorted order, so two writers never deadlock.
+first to commit, then sees its hold or debit, so no two can spend the same money. One call takes
+its locks in sorted order, so two single calls do not deadlock each other (short of a hash
+collision between two lock keys, which Postgres would report as a deadlock).
 
-`placeHold` also rejects a hold of zero or less, and the treasury. Releasing and converting
+In caller mode, locks from several calls accumulate until your transaction ends. Two caller
+transactions that lock the same accounts in opposite orders can deadlock, and Postgres then
+aborts one of them with a deadlock error. Keep one ledger write per caller transaction where you
+can, or make your calls in a consistent order, and retry on a deadlock.
+
+`placeHold` also rejects a hold of zero or less, an order that is not the account's or already has a hold, and the treasury. Releasing and converting
 holds belongs to M2.
 
 ### Errors
@@ -197,7 +202,8 @@ Every rule violation is a `LedgerError` with a `code` from `LedgerErrorCode`, ne
 constraint or trigger message: `TOO_FEW_ENTRIES`, `ZERO_AMOUNT`, `UNBALANCED`,
 `INVALID_CURRENCY`, `AMOUNT_NOT_REPRESENTABLE`, `CORRECTION_NOT_ALLOWED`, `ACCOUNT_NOT_FOUND`,
 `INVALID_DEPOSIT_SHAPE`, `TREASURY_NOT_ALLOWED`, `IDEMPOTENCY_CONFLICT`, `DUPLICATE_CAUSE_KEY`,
-`INSUFFICIENT_BUYING_POWER`, `NON_POSITIVE_HOLD` and `TREASURY_HAS_NO_BUYING_POWER`.
+`INSUFFICIENT_BUYING_POWER`, `NON_POSITIVE_HOLD`, `ORDER_NOT_FOUND`, `HOLD_EXISTS`,
+`UNSUPPORTED_ISOLATION` and `TREASURY_HAS_NO_BUYING_POWER`.
 
 ## What this package does not do
 

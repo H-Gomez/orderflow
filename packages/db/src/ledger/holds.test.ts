@@ -311,6 +311,25 @@ describe.skipIf(databaseUrl === undefined)("holds and buying power (accounts.md)
       expect((await buyingPowerOf(db, account, "BTC")).toFixed()).toBe("0");
     });
 
+    it("ignores RELEASED and CONVERTED holds", async () => {
+      const account = await newAccount(db);
+      await fund(db, account, "USD", "100");
+      for (const state of [HoldState.RELEASED, HoldState.CONVERTED]) {
+        // Written directly: releasing and converting holds is M2's, not this package's yet.
+        await db.hold.create({
+          data: {
+            accountId: account,
+            orderId: await newOrder(db, account, instrument),
+            currency: "USD",
+            amount: "30",
+            state,
+          },
+        });
+      }
+
+      expect((await buyingPowerOf(db, account, "USD")).toFixed()).toBe("100");
+    });
+
     it("rejects the treasury, which has no buying power", async () => {
       await expect(buyingPowerOf(db, await treasuryId(db), "USD")).rejects.toMatchObject({
         code: LedgerErrorCode.TREASURY_HAS_NO_BUYING_POWER,
@@ -374,6 +393,31 @@ describe.skipIf(databaseUrl === undefined)("holds and buying power (accounts.md)
         holds: 0,
       });
       expect(await attempt(account, "USD", "10")).toEqual({ code: null, holds: 1 });
+    });
+
+    it("rejects an unknown account, an order that is not the account's, and a second hold", async () => {
+      const [account, stranger] = [await newAccount(db), await newAccount(db)];
+      await fund(db, account, "USD", "10");
+      await fund(db, stranger, "USD", "10");
+      const place = async (accountId: string, orderId: string) =>
+        placeHold(db, { accountId, orderId, currency: "USD", amount: "1" }).then(
+          () => null,
+          (error: unknown) => (error instanceof LedgerError ? error.code : error),
+        );
+
+      const order = await newOrder(db, account, instrument);
+      expect(await place("00000000-0000-0000-0000-000000000000", order)).toBe(
+        LedgerErrorCode.ACCOUNT_NOT_FOUND,
+      );
+      expect(await place(account, "00000000-0000-0000-0000-000000000000")).toBe(
+        LedgerErrorCode.ORDER_NOT_FOUND,
+      );
+      expect(await place(stranger, order)).toBe(LedgerErrorCode.ORDER_NOT_FOUND);
+      expect(await db.hold.count({ where: { orderId: order } })).toBe(0);
+
+      expect(await place(account, order)).toBeNull();
+      expect(await place(account, order)).toBe(LedgerErrorCode.HOLD_EXISTS);
+      expect(await db.hold.count({ where: { orderId: order } })).toBe(1);
     });
 
     it("in a caller's transaction, a rejection rolls back the caller's order too", async () => {
