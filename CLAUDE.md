@@ -70,3 +70,5 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 - Comments on issues and PRs follow `docs/conventions/agent-comments.md.` Check a body with `pnpm lint:comment` before posting.
 - Never modify anything under `.github/`. Workflow files belong to the human; if a story seems to need a workflow change, say so on the issue and continue without it.
 - The process is `docs/workflow-guide.md.` Read §5.1 before starting a story.
+- Requires Claude Code v2.1.310 or newer; run `claude update` if `claude --version` is older.
+- Guard hooks fail closed. If a hook blocks an edit, stop and say so on the issue; never retry around it.
