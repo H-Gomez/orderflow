@@ -141,7 +141,15 @@ describe.skipIf(databaseUrl === undefined)("schema rules the database enforces",
       // and holds its transaction open, B starts while A is still uncommitted. It also has
       // to start from no treasury at all, or the EXISTS check alone rejects both and the
       // test passes whether or not the lock is there.
-      await prisma.account.deleteMany({ where: { type: AccountType.TREASURY } });
+      //
+      // The treasury is demoted to USER rather than deleted: once the ledger tests have posted
+      // deposits from it, its entries hold it in place (RESTRICT), and the ledger cannot delete
+      // them. Demoting leaves a USER with a negative balance in this shared test database,
+      // which is why every ledger test asserts on balances only for accounts it created.
+      await prisma.account.updateMany({
+        where: { type: AccountType.TREASURY },
+        data: { type: AccountType.USER },
+      });
       expect(await prisma.account.count({ where: { type: AccountType.TREASURY } })).toBe(0);
 
       const sleep = async (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
