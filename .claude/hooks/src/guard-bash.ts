@@ -1,5 +1,6 @@
-/** PreToolUse hook on `Bash`: blocks destructive commands listed in `rules.ts`. */
-import { blockMessage, exitBlocked, runGuard } from "./hook-io.ts";
+/** PreToolUse hook on `Bash`: blocks destructive commands and writes to guarded paths (`rules.ts`). */
+import { findBlockingBashWrite } from "./bash-writes.ts";
+import { blockMessage, exitBlocked, projectDir, runGuard } from "./hook-io.ts";
 import { bashRules } from "./rules.ts";
 import type { BashRule } from "./rules.ts";
 
@@ -71,6 +72,11 @@ if (import.meta.main) {
     const rule = findBlockingBashRule(command);
     if (rule) {
       exitBlocked(blockMessage(rule, command));
+    }
+    const root = projectDir(input);
+    const write = findBlockingBashWrite(command, root, input.cwd ?? root);
+    if (write) {
+      exitBlocked(blockMessage(write.rule, write.target));
     }
   });
 }
