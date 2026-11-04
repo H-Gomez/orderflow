@@ -1,7 +1,7 @@
 ---
 name: Story
 about: A unit of agent-ready work, in the six-section format.
-title: "STORY-<id>: <summary>"
+title: "<summary>"
 labels: story
 assignees: ""
 ---
