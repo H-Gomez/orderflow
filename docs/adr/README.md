@@ -5,8 +5,8 @@ An ADR's status is Proposed, Accepted or Superseded. Nothing counts as decided u
 
 ## Index
 
-| ADR | Title                          | Status          | Issue |
-| --- | ------------------------------ | --------------- | ----- |
-| 001 | Architecture                   | Not yet written | #19   |
-| 002 | Language policy                | Not yet written | #20   |
-| 008 | Test runner (Vitest over Jest) | Not yet written | #21   |
+| ADR | Title                                                                          | Status   | Issue |
+| --- | ------------------------------------------------------------------------------ | -------- | ----- |
+| 001 | [Architecture: queues as the backbone](001-architecture-queues-as-backbone.md) | Accepted | #19   |
+| 002 | [Language policy](002-language-policy.md)                                      | Accepted | #20   |
+| 008 | [Test runner (Vitest over Jest)](008-test-runner-vitest-over-jest.md)          | Accepted | #21   |

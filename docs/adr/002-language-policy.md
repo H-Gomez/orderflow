@@ -1,6 +1,6 @@
 # ADR-002: Language policy
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-04
 - Decider: H-Gomez (repository owner)
 - Issue: #20
@@ -31,22 +31,26 @@ TypeScript is the default for every package and service. Python with FastAPI is 
 market-data edge, the feed ingestor and the index service, because neither has ledger contact. Any
 other non-TypeScript service needs its own ADR.
 
-The primary reason for choosing Python at the edge rather than TypeScript is TBC.
+Rationale, stated plainly: on engineering merit alone, all-TypeScript wins, as the alternatives
+below show. Python is chosen because the roles this project targets name Python/FastAPI, and the
+market-data edge is the lowest-risk place to demonstrate it: self-contained, no ledger contact, and
+disposable if it fails.
 
 ## Alternatives considered
 
-- **All TypeScript.** The strongest alternative. One toolchain, one package manager, one linter, one
-  test runner, one CI path. The edge services could import `packages/contracts` directly, so a tick
-  or index-event schema change is a compile error everywhere instead of a runtime mismatch.
-  WebSocket clients and a median calculation are well within Node's reach, so nothing at the edge
-  requires Python. Agents working in the repo also need to hold only one set of conventions. It
-  loses only if the reason for Python at the edge (TBC) outweighs these costs; if that reason does
-  not hold up, this alternative should win.
+- **All TypeScript.** The strongest alternative on engineering merit. One toolchain, one package
+  manager, one linter, one test runner, one CI path. The edge services could import
+  `packages/contracts` directly, so a tick or index-event schema change is a compile error everywhere
+  instead of a runtime mismatch. WebSocket clients and a median calculation are well within Node's
+  reach, so nothing at the edge requires Python. Agents working in the repo also need to hold only
+  one set of conventions. It loses only on the non-technical goal in the rationale above: it does not
+  demonstrate Python/FastAPI.
 - **Go for the market-data edge.** The natural "why not Go" question: the edge is long-lived
   WebSocket connections and small, CPU-light aggregation, which suits Go's concurrency model and
   single static binaries. It loses because it adds a third language and toolchain with no shared
-  types, for a workload whose rates (TBC) do not obviously need Go's performance, and it offers none
-  of whatever Python brings at the edge (TBC). Revisit if the ingestor becomes a measured bottleneck.
+  types, for a workload whose rates (TBC, measured in M3) do not obviously need Go's performance, and
+  it does not serve the goal of demonstrating Python/FastAPI. Revisit if the ingestor becomes a
+  measured bottleneck.
 - **Python more widely (for example the Desk Analyst or bots).** Loses because the analyst and bots
   call the API and read user data, which keeps them inside the ledger-adjacent core where the
   TypeScript invariants apply.
@@ -55,12 +59,13 @@ The primary reason for choosing Python at the edge rather than TypeScript is TBC
 
 - Easier: the ledger, settlement and engine stay in one language under one strict compiler config,
   so the money and typing invariants are enforced in one place.
-- Harder: `packages/contracts` (zod) cannot be imported from Python. Messages crossing the boundary
-  (ticks on Redis Streams, index events) need a second definition; how the two are kept in sync
-  (generated JSON Schema, Pydantic models, contract tests) is TBC.
+- Harder: `packages/contracts` (zod) cannot be imported from Python. JSON Schema is generated from
+  the zod schemas in `packages/contracts` at build time, the Python services validate against those
+  files with pydantic, and one contract test in CI fails if either side drifts.
 - Harder: two toolchains in CI and in `/ship`, which must detect a package's language from its
-  manifest. Python version and dependency manager are TBC.
+  manifest. Python services use Python 3.13, managed with uv.
 - Must stay true: Python code never writes to the ledger or the orders path. If an edge service
   needs that, this ADR is superseded first.
-- Must stay true: the money rule still applies in Python. Prices and amounts use `decimal.Decimal`,
-  never `float`. Whether index prices count as amounts under that rule is TBC.
+- Must stay true: the money rule applies in Python. Index prices are amounts under that rule: they
+  use `decimal.Decimal`, never `float`, with the same scale rules as
+  [ledger.md](../domain/ledger.md).

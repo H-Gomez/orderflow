@@ -1,6 +1,6 @@
 # ADR-001: Architecture: queues as the backbone
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-04
 - Decider: H-Gomez (repository owner)
 - Issue: #19
@@ -26,20 +26,26 @@ event ID, the engine publishes only via the outbox, and the ledger is never upda
 consumer, outbox and SNS publisher, settlement consumer) cannot be specified until the transport is
 chosen.
 
-Expected message rates per instrument and in total are TBC.
+The published load targets are 500 RPS of sustained order placement, bursts of 200 orders/s, and
+10,000 concurrent WebSocket clients. Tick rates are whatever the three venues send and are measured
+in M3.
 
 ## Decision
 
 Use a different transport for each traffic class rather than one bus:
 
-- **SQS FIFO** for order commands (`orders.fifo`) and for settlement input, with the message group ID
-  set per instrument (TBC: per instrument or per account for settlement) so ordering holds where it
-  matters and unrelated books proceed in parallel.
+- **SQS FIFO** for order commands (`orders.fifo`) and for settlement input (`settlement.fifo`).
 - **Transactional outbox to SNS** for everything the matching engine emits. The engine writes its
   state change and the outgoing event in one Postgres transaction; a relay publishes outbox rows to
-  SNS (FIFO topic, TBC), which fans out to subscriber queues.
+  the SNS FIFO topic `trade-events.fifo`, which fans out to subscriber queues including
+  `settlement.fifo`. The topic is FIFO because a standard SNS topic cannot deliver to FIFO queues.
+- **Message group = instrument, end to end:** on `orders.fifo`, on `trade-events.fifo` and on
+  `settlement.fifo`. Ordering holds per book, and unrelated books proceed in parallel. Per-account
+  ordering is not required for settlement: each fill is self-contained, the hold already reserved the
+  funds, and the ledger API is idempotent on fill ID and locks per account and currency. This
+  supersedes any earlier "group = account" wording for settlement.
 - **Redis Streams** for external ticks from the feed ingestor to the index service, trimmed to a
-  bounded length (retention TBC).
+  bounded length.
 - **Redis pub/sub** for the UI latency path into the WebSocket gateway, with sequence numbers so a
   client that detects a gap resyncs from a snapshot.
 
@@ -59,13 +65,14 @@ Use a different transport for each traffic class rather than one bus:
   an SNS layer. It loses here on cost and operational weight for a paper-trading project of this
   size: a managed cluster has a standing monthly cost and brokers, partitions and consumer-group
   rebalancing to operate (figures TBC), against SQS and SNS, which are pay-per-request and have
-  nothing to run. Kafka also does not remove the outbox: a database write plus a Kafka produce is
-  still a dual write. A single topic would also mix traffic with very different needs (durable
-  fills next to disposable ticks). Revisit if replay of the full event history becomes a requirement
-  or SQS FIFO throughput limits are reached (limits TBC).
-- **Redis for everything.** Already present for ticks and UI. Loses for orders and settlement because
-  its durability depends on persistence settings (TBC) and it is not where we want the only copy of a
-  fill.
+  nothing to run. The project budgets about £1 to 3 a month for SQS and SNS; a managed Kafka cluster
+  has a standing cost an order of magnitude above that, to be verified in ADR-003. Kafka also does
+  not remove the outbox: a database write plus a Kafka produce is still a dual write. A single topic
+  would also mix traffic with very different needs (durable fills next to disposable ticks). Revisit
+  if replay of the full event history becomes a requirement or SQS FIFO throughput limits are reached
+  (limits TBC).
+- **Redis for everything.** Already present for ticks and UI. Loses for orders and settlement
+  because Redis is never the system of record, and it is not where we want the only copy of a fill.
 - **SQS for ticks and UI as well.** Loses on latency and per-message cost at tick rates, and SQS has
   no cheap broadcast to many WebSocket nodes.
 
@@ -74,14 +81,19 @@ Use a different transport for each traffic class rather than one bus:
 - Easier: each path gets the guarantee it needs and no more. Ordering and deduplication for orders
   come from SQS FIFO; fill delivery survives engine crashes; ticks and UI stay fast and cheap.
 - Easier: no cluster to run. SQS and SNS are managed and billed per request.
-- Harder: four transports to learn, provision, monitor and test locally (local emulation approach
-  TBC). Each needs its own section in `docs/events.md`.
+- Harder: four transports to learn, provision, monitor and test locally. Local emulation is owned by
+  ADR-003; the default is LocalStack for SQS and SNS plus Redis, both in `docker-compose.yml`. Each
+  transport needs its own section in `docs/events.md`.
 - Harder: no single replayable log of everything. Rebuilding state means replaying from Postgres
   (outbox and ledger), not from the bus.
+- Redis Streams retention is TBD, owned by the feed-ingestor story. The default when it is specified
+  is the last 60 minutes per venue.
 - Must stay true: the engine never calls SNS or SQS directly; only the outbox relay publishes.
 - Must stay true: every consumer deduplicates on event ID, because the outbox and SQS both deliver at
-  least once. SQS FIFO deduplication covers a limited window (TBC) and is not a substitute.
-- Must stay true: nothing on Redis pub/sub is the system of record. A UI client that misses a
-  sequence number must be able to resync from a snapshot.
-- Ordering holds only within a message group. Anything that needs order across instruments must not
-  rely on the queue for it.
+  least once. SQS FIFO deduplicates for 5 minutes only, and that is not a substitute for consumer
+  idempotency.
+- Must stay true: Redis persistence is not relied on. Redis is never the system of record, for
+  Streams or pub/sub. A UI client that misses a sequence number must be able to resync from a
+  snapshot.
+- Ordering holds only within a message group, that is, within one instrument. Anything that needs
+  order across instruments must not rely on the queue for it.
