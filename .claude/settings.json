@@ -6,8 +6,10 @@
       "Write(.github/workflows/**)",
       "Edit(infra/prod/**)",
       "Write(infra/prod/**)",
-      "Edit(**/.env*)",
-      "Write(**/.env*)"
+      "Edit(**/.env)",
+      "Write(**/.env)",
+      "Edit(**/.env.local)",
+      "Write(**/.env.local)"
     ]
   },
   "hooks": {
