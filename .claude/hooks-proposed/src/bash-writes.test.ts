@@ -195,6 +195,7 @@ const INLINE_CODE: readonly BlockCase[] = [
   [`node <<'EOF'\nrequire('fs').rmSync('.github')\nEOF`, "github-dir"],
   [`bash <<'EOF'\necho x > .claude/hooks/a\nEOF`, "claude-hooks"],
   [`sh <<< "rm CLAUDE.md"`, "claude-md"],
+  [`echo "rm CLAUDE.md" | sh`, "claude-md"],
   [`cat <<'EOF' | python3\nopen('CLAUDE.md','w')\nEOF`, "claude-md"],
 ];
 
@@ -218,14 +219,17 @@ const UNRESOLVED: readonly string[] = [
   "patch a.txt x.patch",
 ];
 
+const asRows = (cases: readonly BlockCase[]): { command: string; id: string; cwd: string }[] =>
+  cases.map(([command, id, cwd]) => ({ command, id, cwd: cwd ?? ROOT }));
+
 describe("chains and evasion", () => {
-  it.each(CHAINS_AND_EVASION)("blocks %j as %s", (command, id, cwd) => {
-    expect(blockedBy(command, cwd ?? ROOT)).toBe(id);
+  it.each(asRows(CHAINS_AND_EVASION))("blocks $command as $id", ({ command, id, cwd }) => {
+    expect(blockedBy(command, cwd)).toBe(id);
   });
 });
 
 describe("inline code and interpreter heredocs", () => {
-  it.each(INLINE_CODE)("blocks %j as %s", (command, id) => {
+  it.each(asRows(INLINE_CODE))("blocks $command as $id", ({ command, id }) => {
     expect(blockedBy(command)).toBe(id);
   });
 });
@@ -308,6 +312,13 @@ const ALLOWED: readonly string[] = [
   "cd .claude/hooks && pnpm vitest run",
   "(cd .claude/hooks && cat a); echo x > out.txt",
   "F=out.txt; echo x > $F",
+  'if [[ "$a" > "$b" ]]; then echo yes; fi',
+  'ls | while read -r f; do echo "$f"; done',
+  "echo $((1 > 0))",
+  "[ -f x ] && echo yes",
+  "git add .claude/hooks-proposed/src/x.ts",
+  "git commit -q -F /tmp/x && git push -q",
+  "pnpm --silent lint:comment < /tmp/x",
   // Inline code that does not mention a guarded root.
   'bash -c "pnpm test"',
   'bash -c "echo x > .claude/hooks-notes.md"',
