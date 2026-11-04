@@ -105,6 +105,28 @@ When no server answers, the database tests skip and the suite stays green, which
 should happen on a machine without Docker. Under `CI` they fail instead, so a pipeline with no
 database cannot pass by doing nothing ([src/testing/database-guard.ts](src/testing/database-guard.ts)).
 
+### Test databases for other packages
+
+`@orderflow/db/testing` gives a test file a database of its own. The main entry exports none of this.
+
+```ts
+import { balanceOf } from "@orderflow/db";
+import { createTestDatabase, fund, newAccount } from "@orderflow/db/testing";
+
+const database = await createTestDatabase();
+
+describe.skipIf(database === undefined)("my feature", () => {
+  afterAll(async () => database?.drop());
+  // database.client is connected to a fresh, migrated database.
+});
+```
+
+`createTestDatabase()` returns `{ client, databaseUrl, drop() }`. `drop()` disconnects the client and then drops the database, and is safe to call twice. A failed migration drops the database before throwing.
+
+It finds its server through `DATABASE_URL`, or the compose server. With no server answering it follows the rules above: it resolves `undefined` so the file can skip, and throws under `CI` so a pipeline with no database cannot pass by doing nothing.
+
+The same entry exports the ledger fixtures `treasuryId`, `newAccount`, `fund`, `newInstrument`, `newOrder` and `unique`.
+
 ## The ledger API
 
 `src/ledger/` is the only sanctioned way to write the ledger, and the way everything else reads
@@ -126,13 +148,14 @@ await postTransaction(db, {
 });
 ```
 
-| Function                                                             | What it does                                                                         |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `postTransaction(db, { type, causeKey, entries })`                   | Writes one transaction and its entries, all or none. Returns it with its entries.    |
-| `balanceOf(db, accountId, currency)`                                 | The sum of the account's entries in that currency, computed now (accounts.md §3).    |
-| `buyingPowerOf(db, accountId, currency)`                             | Balance minus the account's ACTIVE holds (accounts.md §5). Rejects the treasury.     |
-| `placeHold(db, { accountId, orderId, currency, amount })`            | Checks buying power and creates an ACTIVE hold, atomically (accounts.md §4.3).       |
-| `DISPLAY_SCALE`, `DEFAULT_DISPLAY_SCALE`, `displayScaleOf(currency)` | Decimal places to show: USD 2, anything else 8. Display only; never on a write path. |
+| Function                                                             | What it does                                                                            |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `postTransaction(db, { type, causeKey, entries })`                   | Writes one transaction and its entries, all or none. Returns it with its entries.       |
+| `balanceOf(db, accountId, currency)`                                 | The sum of the account's entries in that currency, computed now (accounts.md §3).       |
+| `buyingPowerOf(db, accountId, currency)`                             | Balance minus the account's ACTIVE holds (accounts.md §5). Rejects the treasury.        |
+| `heldOf(db, accountId, currency)`                                    | The sum of the account's ACTIVE holds, computed now by Postgres. Zero for the treasury. |
+| `placeHold(db, { accountId, orderId, currency, amount })`            | Checks buying power and creates an ACTIVE hold, atomically (accounts.md §4.3).          |
+| `DISPLAY_SCALE`, `DEFAULT_DISPLAY_SCALE`, `displayScaleOf(currency)` | Decimal places to show: USD 2, anything else 8. Display only; never on a write path.    |
 
 ### Money: `ExactDecimal`, never `Prisma.Decimal` arithmetic
 
@@ -140,7 +163,7 @@ An amount goes in as a decimal string, a `bigint` or a `Decimal`, never a JavaSc
 It must fit `NUMERIC(38, 18)` exactly, at most 18 decimal places and 20 integer digits, because
 Postgres would otherwise round it without a word (ledger.md §7).
 
-`balanceOf` and `buyingPowerOf` return an `ExactDecimal`. Use it, or `ExactDecimal` itself, for
+`balanceOf`, `buyingPowerOf` and `heldOf` return an `ExactDecimal`. Use it, or `ExactDecimal` itself, for
 any arithmetic on money. `Prisma.Decimal` is decimal.js at 20 significant digits, so its
 `plus` and `minus` round: `12345678901234567890.123456789012345678` plus `0.000000000000000001`
 comes back as `12345678901234567890`.

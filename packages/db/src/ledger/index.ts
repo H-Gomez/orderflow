@@ -1,6 +1,7 @@
 export { balanceOf, buyingPowerOf } from "./balances.js";
 export { DEFAULT_DISPLAY_SCALE, DISPLAY_SCALE, displayScaleOf } from "./display-scale.js";
 export { LedgerError, LedgerErrorCode } from "./errors.js";
+export { heldOf } from "./holds-read.js";
 export { placeHold } from "./holds.js";
 export type { PlaceHoldInput } from "./holds.js";
 export { ExactDecimal } from "./money.js";
