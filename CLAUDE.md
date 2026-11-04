@@ -69,6 +69,7 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 - If the spec is ambiguous or conflicts with this file, stop and ask on the issue. Don't guess.
 - Comments on issues and PRs follow `docs/conventions/agent-comments.md.` Check a body with `pnpm lint:comment` before posting.
 - Never modify anything under `.github/`. Workflow files belong to the human; if a story seems to need a workflow change, say so on the issue and continue without it.
-- The process is `docs/workflow-guide.md.` Read §5.1 before starting a story.
+- The process is `docs/agent-workflow-guide.md.` Read §5.1 before starting a story.
 - Requires Claude Code v2.1.310 or newer; run `claude update` if `claude --version` is older.
 - Guard hooks fail closed. If a hook blocks an edit, stop and say so on the issue; never retry around it.
+- Guard hooks also check Bash: a command that writes to a guarded path, or whose write target cannot be resolved, is blocked; write to a literal path. The list lives in .claude/hooks/src/rules.ts. .claude/hooks/** and .claude/settings.json change only by human commit; agents propose under .claude/hooks-proposed/.
