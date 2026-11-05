@@ -10,6 +10,7 @@ import { errorResponseSchema } from "../errors/error-response.js";
 import { livenessResponseSchema, readinessResponseSchema } from "../health/health.controller.js";
 import { meResponseSchema } from "../me/me.controller.js";
 import { moneySchema } from "../money/money.js";
+import { portfolioResponseSchema } from "../portfolio/portfolio.controller.js";
 
 type ComponentSchema = NonNullable<NonNullable<OpenAPIObject["components"]>["schemas"]>[string];
 
@@ -21,8 +22,8 @@ const componentSchema = (schema: z.ZodType, description: string): ComponentSchem
   }) as ComponentSchema;
 
 /**
- * Named here, in one place, from the zod schemas the service itself uses. No route returns money
- * yet, so `Money` is published for the #36 endpoints to reference.
+ * Named here, in one place, from the zod schemas the service itself uses. Each is converted on its
+ * own, so a response schema carries the `Money` pattern inline rather than a reference to `Money`.
  */
 const COMPONENTS = {
   ErrorResponse: componentSchema(errorResponseSchema, "The shape of every failure."),
@@ -31,6 +32,10 @@ const COMPONENTS = {
   Money: componentSchema(
     moneySchema,
     "An exact decimal amount as a string, NUMERIC(38, 18). Never a JSON number, so precision survives, and never in exponent notation. It is not rounded to any display scale.",
+  ),
+  PortfolioResponse: componentSchema(
+    portfolioResponseSchema,
+    "The caller's balance, held amount and buying power in each currency with a non-zero balance, ordered by currency code.",
   ),
   ReadinessResponse: componentSchema(readinessResponseSchema, "The database answered."),
 };

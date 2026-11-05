@@ -39,13 +39,14 @@ describe("the committed OpenAPI document", () => {
   it("has the routes of this story and no test-only route", async () => {
     const { paths } = await committed();
 
-    expect(Object.keys(paths).sort()).toEqual(["/health", "/health/ready", "/me"]);
+    expect(Object.keys(paths).sort()).toEqual(["/health", "/health/ready", "/me", "/portfolio"]);
   });
 
   it("marks /me as needing a bearer token and the health routes as not", async () => {
     const { paths } = await committed();
 
     expect(paths["/me"]?.get?.security).toEqual([{ bearer: [] }]);
+    expect(paths["/portfolio"]?.get?.security).toEqual([{ bearer: [] }]);
     expect(paths["/health"]?.get?.security).toBeUndefined();
     expect(paths["/health/ready"]?.get?.security).toBeUndefined();
   });
