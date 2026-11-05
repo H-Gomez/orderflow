@@ -35,10 +35,10 @@ An entry carries no running balance, no "balance after" field, and no link to a 
 
 A transaction is the unit of change. It groups two or more entries and is written atomically: every entry commits or none does.
 
-- A transaction has at least two entries. There is no exception. Seeding is two entries: a deduction from the treasury and an addition to the destination account.
+- A transaction has at least two entries. There is no exception. Seeding is two entries per seeded currency: a deduction from the treasury and an addition to the destination account.
 - Within a transaction, the entries sum to zero for each currency present. A transaction that does not is rejected before it commits; it is never written and flagged later.
 - A transaction may touch more than one currency. A trade does: the base currency moves one way and the quote currency the other, and each currency balances on its own.
-- A transaction is keyed by its cause (the fill id for a trade, the seed run, account and currency for a deposit). Writing a transaction whose key already exists is a no-op that succeeds. This is how CLAUDE.md's "consumers are idempotent on event ID" reaches the ledger; the hold side of it is in accounts.md §4.
+- A transaction is keyed by its cause (the fill id for a trade, the seed run, account and currency for a deposit, as `seed:<runId>:<accountId>:<currency>`). Writing a transaction whose key already exists is a no-op that succeeds. This is how CLAUDE.md's "consumers are idempotent on event ID" reaches the ledger; the hold side of it is in accounts.md §4.
 
 ## 4. Append-only
 

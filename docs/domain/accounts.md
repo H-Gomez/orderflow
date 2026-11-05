@@ -73,7 +73,7 @@ Every input is computed; the result is computed and never stored. It may reach z
 
 ## 6. Seeding
 
-Money never enters the system. Seeding moves it from the treasury to another account. Creating a user or bot account writes one `DEPOSIT` transaction per seeded currency (ledger.md §6): the treasury is debited the seed amount in that currency and the new account is credited the same amount. A `USER` is seeded in the quote currency only. A `BOT` is also seeded with inventory in each base currency it makes markets in, because a market maker must be able to sell before it has ever bought. Decision D1 (4 Nov 2026). The pair sums to zero. Nothing else writes a balance into existence.
+Money never enters the system. Seeding moves it from the treasury to another account. Creating a user or bot account writes one `DEPOSIT` transaction per seeded currency (ledger.md §6): the treasury is debited the seed amount in that currency and the new account is credited the same amount. The pair sums to zero. A `USER` is seeded in the quote currency only. Every `BOT` is also seeded with inventory in every instrument's base currency, because a market maker must be able to sell before it has ever bought; the amounts are the seed script's constants. Decision D1 (4 Nov 2026). Nothing else writes a balance into existence.
 
 Without the treasury, seeding would be a one-sided entry, which breaks sum-to-zero. That is why the treasury exists. In a production exchange it would be a clearing account representing the firm's bank or custody balance, reconciled against it; in OrderFlow it represents virtual money and has nothing to reconcile against.
 
