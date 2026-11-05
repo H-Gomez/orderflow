@@ -187,6 +187,100 @@
         "summary": "The authenticated caller's balances, holds and buying power",
         "tags": ["Portfolio"]
       }
+    },
+    "/ledger": {
+      "get": {
+        "description": "Keyset-paginated, sorted by (createdAt desc, id desc), at most 200 entries a page. createdAt is when the entry was written, and the time filter applies to it: for a seeded trade that is the seed-run time, not the trade time. fillId leads from a TRADE entry to its trade.",
+        "operationId": "LedgerController_ledger",
+        "parameters": [
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "pattern": "^[A-Z]{3,4}$" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Exclusive, with an offset."
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Inclusive, with an offset."
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "The nextCursor of a previous page."
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LedgerPage" } }
+            }
+          },
+          "400": {
+            "description": "The request failed validation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "403": {
+            "description": "The token is valid, but its subject has no account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "429": {
+            "description": "Over the rate limit. See the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the limit resets.",
+                "schema": { "type": "integer" }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "500": {
+            "description": "Something went wrong. The body carries no detail.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "503": {
+            "description": "A dependency is unavailable.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "The authenticated caller's own ledger entries",
+        "tags": ["Ledger"]
+      }
     }
   },
   "info": {
@@ -241,6 +335,44 @@
         "required": ["code", "message", "correlationId"],
         "additionalProperties": false,
         "description": "The shape of every failure."
+      },
+      "LedgerPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "transactionId": { "type": "string" },
+                "type": { "type": "string", "enum": ["DEPOSIT", "TRADE", "CORRECTION"] },
+                "currency": { "type": "string" },
+                "amount": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "fillId": { "nullable": true, "type": "string" }
+              },
+              "required": [
+                "id",
+                "transactionId",
+                "type",
+                "currency",
+                "amount",
+                "createdAt",
+                "fillId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": { "nullable": true, "type": "string" }
+        },
+        "required": ["items", "nextCursor"],
+        "additionalProperties": false,
+        "description": "One page of the caller's ledger entries, newest first. nextCursor is null on the last page."
       },
       "LivenessResponse": {
         "type": "object",
