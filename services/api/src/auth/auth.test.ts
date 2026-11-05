@@ -141,6 +141,12 @@ describe("authentication, with no database behind it", () => {
 
 const database: TestDatabase | undefined = await createTestDatabase();
 
+// At file level, because a throwing afterAll stops the rest of its own suite's hooks: from inside
+// the describe, a failed set-up would skip this and leave the database on the server.
+afterAll(async () => {
+  await database?.drop();
+});
+
 describe.skipIf(database === undefined)("authentication against a real database", () => {
   let oidc: TestOidc;
   let app: INestApplication<App>;
@@ -160,7 +166,6 @@ describe.skipIf(database === undefined)("authentication against a real database"
   afterAll(async () => {
     await app.close();
     await oidc.stop();
-    await database?.drop();
   });
 
   it("answers 200 with the account of the User whose authSubject is the token's sub", async () => {

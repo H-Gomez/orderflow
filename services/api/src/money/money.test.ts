@@ -103,6 +103,12 @@ describe("money in a response", () => {
 
 const database: TestDatabase | undefined = await createTestDatabase();
 
+// At file level, because a throwing afterAll stops the rest of its own suite's hooks: from inside
+// the describe, a failed set-up would skip this and leave the database on the server.
+afterAll(async () => {
+  await database?.drop();
+});
+
 describe.skipIf(database === undefined)("money from the ledger to the response", () => {
   let app: INestApplication<App>;
 
@@ -119,7 +125,6 @@ describe.skipIf(database === undefined)("money from the ledger to the response",
 
   afterAll(async () => {
     await app.close();
-    await database?.drop();
   });
 
   it.each(["0.00000001", SMALLEST, LARGEST])("keeps %s exact", async (amount) => {

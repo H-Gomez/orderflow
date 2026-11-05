@@ -13,6 +13,12 @@ import { meResponseSchema } from "./me.controller.js";
 
 const database: TestDatabase | undefined = await createTestDatabase();
 
+// At file level, because a throwing afterAll stops the rest of its own suite's hooks: from inside
+// the describe, a failed set-up would skip this and leave the database on the server.
+afterAll(async () => {
+  await database?.drop();
+});
+
 describe.skipIf(database === undefined)("GET /me", () => {
   let oidc: TestOidc;
   let app: INestApplication<App>;
@@ -32,7 +38,6 @@ describe.skipIf(database === undefined)("GET /me", () => {
   afterAll(async () => {
     await app.close();
     await oidc.stop();
-    await database?.drop();
   });
 
   it("returns exactly the caller's account id, type and creation time", async () => {
