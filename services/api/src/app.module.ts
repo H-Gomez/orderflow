@@ -9,17 +9,21 @@ import { ConfigModule } from "./config/config.module.js";
 import type { AppConfig } from "./config/config.js";
 import { DatabaseModule } from "./database/database.module.js";
 import { AllExceptionsFilter } from "./errors/all-exceptions.filter.js";
+import { PrincipalThrottlerGuard } from "./rate-limit/principal-throttler.guard.js";
+import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 
 @Module({})
 export class AppModule {
   static forRoot(config: AppConfig): DynamicModule {
     return {
       module: AppModule,
-      imports: [ConfigModule.forRoot(config), DatabaseModule, AuthModule],
+      imports: [ConfigModule.forRoot(config), DatabaseModule, AuthModule, RateLimitModule],
       providers: [
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
-        // Global guards run in this order, so a request without a valid token never reaches the database.
+        // Global guards run in this order. No valid token never reaches the database, and neither does
+        // a caller over its limit.
         { provide: APP_GUARD, useClass: JwtAuthGuard },
+        { provide: APP_GUARD, useClass: PrincipalThrottlerGuard },
         { provide: APP_GUARD, useClass: AccountGuard },
       ],
     };
