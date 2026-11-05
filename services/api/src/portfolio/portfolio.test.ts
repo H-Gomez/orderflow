@@ -160,13 +160,30 @@ describe.skipIf(database === undefined)("GET /portfolio", () => {
       const response = await getPortfolio(subject, `?accountId=${second}`);
 
       expect(response.status).toBe(400);
-      expect(errorBody(response).code).toBe("VALIDATION_FAILED");
       expect(errorBody(response).fields?.[0]?.path).toBe("query");
       expect(errorBody(response).fields?.[0]?.message).toContain("accountId");
-      expect(JSON.stringify(response.body)).not.toContain(second);
-      expect(JSON.stringify(response.body)).not.toContain("USD");
-      expect(JSON.stringify(response.body)).not.toContain("SOL");
+      // The exact body, so it can hold none of the second account's id, currencies or amounts. The
+      // correlation id is random, so a search of the text could match its digits by chance.
+      const { correlationId, ...rest } = errorBody(response);
+      expect(correlationId).toEqual(expect.any(String));
+      expect(rest).toEqual({
+        code: "VALIDATION_FAILED",
+        message: "Request validation failed.",
+        fields: [{ path: "query", message: 'Unrecognized key: "accountId"' }],
+      });
     });
+  });
+
+  it("answers 400 to any other query parameter", async () => {
+    const { subject } = await newCaller();
+
+    const response = await getPortfolio(subject, "?foo=bar");
+
+    expect(response.status).toBe(400);
+    expect(errorBody(response).code).toBe("VALIDATION_FAILED");
+    expect(errorBody(response).fields).toEqual([
+      { path: "query", message: 'Unrecognized key: "foo"' },
+    ]);
   });
 
   it("answers 200 with no rows for an account with no entries", async () => {
@@ -190,10 +207,36 @@ describe.skipIf(database === undefined)("GET /portfolio", () => {
         { currency: "BTC", balance: "0.00000001", held: "0", buyingPower: "0.00000001" },
       ],
     });
-    const { currencies } = portfolioResponseSchema.parse(response.body);
-    for (const value of currencies.flatMap((row) => Object.values(row))) {
+    // The raw body, not a parsed copy: parsing would throw on a non-string before this could look.
+    const { currencies } = response.body as { currencies: Record<string, unknown>[] };
+    const values = currencies.flatMap((row) => Object.values(row));
+    expect(values).toHaveLength(4);
+    for (const value of values) {
       expect(typeof value).toBe("string");
     }
+  });
+
+  it("never rounds to a display scale", async () => {
+    const { accountId, subject } = await newCaller();
+    await fund(client(), accountId, "USD", "1234.567");
+    await fund(client(), accountId, "BTC", "0.123456789012345678");
+    const orderId = await newOrder(client(), accountId, await newInstrument(client()));
+    await placeHold(client(), { accountId, orderId, currency: "USD", amount: "0.001" });
+
+    const response = await getPortfolio(subject);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      currencies: [
+        {
+          currency: "BTC",
+          balance: "0.123456789012345678",
+          held: "0",
+          buyingPower: "0.123456789012345678",
+        },
+        { currency: "USD", balance: "1234.567", held: "0.001", buyingPower: "1234.566" },
+      ],
+    });
   });
 
   it("answers 401 with no token, in the documented error shape", async () => {

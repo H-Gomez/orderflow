@@ -22,8 +22,8 @@ const componentSchema = (schema: z.ZodType, description: string): ComponentSchem
   }) as ComponentSchema;
 
 /**
- * Named here, in one place, from the zod schemas the service itself uses. No route returns money
- * yet, so `Money` is published for the #36 endpoints to reference.
+ * Named here, in one place, from the zod schemas the service itself uses. Each is converted on its
+ * own, so a response schema carries the `Money` pattern inline rather than a reference to `Money`.
  */
 const COMPONENTS = {
   ErrorResponse: componentSchema(errorResponseSchema, "The shape of every failure."),
