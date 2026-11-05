@@ -1,10 +1,14 @@
 import "reflect-metadata";
 
 import { Injectable } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
 import { describe, expect, it } from "vitest";
 
 import vitestConfig from "../vitest.config.js";
+
+import { JwksVerifier } from "./auth/jwks-verifier.js";
+import { JwtAuthGuard } from "./auth/jwt-auth.guard.js";
 
 @Injectable()
 class Dependency {
@@ -28,6 +32,13 @@ describe("decorator metadata under unplugin-swc", () => {
 
   it("emits the constructor's parameter types", () => {
     expect(Reflect.getMetadata("design:paramtypes", Consumer)).toEqual([Dependency]);
+  });
+
+  it("emits them for this service's own guard", () => {
+    expect(Reflect.getMetadata("design:paramtypes", JwtAuthGuard)).toEqual([
+      JwksVerifier,
+      Reflector,
+    ]);
   });
 
   it("lets Nest inject a provider by its type, with no explicit token", async () => {
