@@ -77,12 +77,12 @@ In OpenAPI, reference the `Money` component for any amount.
 
 Every list endpoint uses one scheme, from [src/pagination/](src/pagination/pagination.ts). It is keyset, never offset, so a row written between two pages neither repeats nor skips a row.
 
-| Parameter | Meaning                                                                              |
-| --------- | ------------------------------------------------------------------------------------ |
-| `limit`   | An integer from 1 to 200. Default 50.                                                |
-| `cursor`  | Opaque: the `nextCursor` of a previous page.                                         |
-| `from`    | Inclusive. An ISO 8601 date-time with an offset, at most millisecond precision.      |
-| `to`      | Exclusive, in the same format. `from` must be earlier, or it is a 400 at `query.to`. |
+| Parameter | Meaning                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------- |
+| `limit`   | An integer from 1 to 200. Default 50.                                                        |
+| `cursor`  | Opaque: the `nextCursor` of a previous page.                                                 |
+| `from`    | Inclusive. An ISO 8601 date-time with an offset, at most millisecond precision, from year 1. |
+| `to`      | Exclusive, in the same format. `from` must be earlier, or it is a 400 at `query.to`.         |
 
 Send a `+` in an offset as `%2B`. A bare `+` in a query string decodes to a space, which is a 400.
 

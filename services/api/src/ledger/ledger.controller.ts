@@ -19,8 +19,18 @@ import {
 } from "../pagination/pagination.js";
 import { ZodPipe } from "../validation/zod.pipe.js";
 
-/** Newest first. Every entry of a transaction shares its timestamp, so `id` breaks the ties. */
-const ledgerKeySchema = z.strictObject({ createdAt: dateTimeSchema, id: z.uuid() });
+/**
+ * Newest first. Every entry of a transaction shares its timestamp, so `id` breaks the ties. The id
+ * is any text but a NUL, which Postgres rejects: the column is TEXT, and a CORRECTION written by hand
+ * (ledger.md section 4) chooses its own id, which must not leave a walk stuck on a refused cursor.
+ */
+const ledgerKeySchema = z.strictObject({
+  createdAt: dateTimeSchema,
+  id: z
+    .string()
+    .min(1)
+    .refine((id) => !id.includes("\u0000")),
+});
 
 export const ledgerQuerySchema = listQuerySchema(ledgerKeySchema, {
   currency: z
@@ -99,13 +109,13 @@ export class LedgerController {
     name: "from",
     required: false,
     schema: { type: "string", format: "date-time" },
-    description: "Inclusive, with an offset.",
+    description: "Inclusive, with an offset. At most millisecond precision, from year 1.",
   })
   @ApiQuery({
     name: "to",
     required: false,
     schema: { type: "string", format: "date-time" },
-    description: "Exclusive, with an offset.",
+    description: "Exclusive, with an offset. At most millisecond precision, from year 1.",
   })
   @ApiQuery({
     name: "currency",

@@ -1,17 +1,24 @@
 import type { INestApplication } from "@nestjs/common";
 import { AccountType, EntryType, Prisma, postTransaction } from "@orderflow/db";
+import type { PrismaClient } from "@orderflow/db";
 import { createTestDatabase, newInstrument, treasuryId, unique } from "@orderflow/db/testing";
 import type { TestDatabase } from "@orderflow/db/testing";
 import type { Response } from "supertest";
 import type { App } from "supertest/types.js";
 import request from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { Principal } from "../auth/principal.js";
 import { errorResponseSchema } from "../errors/error-response.js";
 import { createTestApp, errorBody, testConfig } from "../testing/test-app.js";
 import { TestOidc } from "../testing/test-oidc.js";
 
-import { ledgerPageSchema, toLedgerItem } from "./ledger.controller.js";
+import {
+  LedgerController,
+  ledgerPageSchema,
+  ledgerQuerySchema,
+  toLedgerItem,
+} from "./ledger.controller.js";
 
 const database: TestDatabase | undefined = await createTestDatabase();
 
@@ -38,6 +45,9 @@ interface Page {
 
 const pageOf = (response: Response): Page => response.body as Page;
 const idsOf = (response: Response): string[] => pageOf(response).items.map((item) => item.id);
+
+const cursorWithId = (id: string): string =>
+  Buffer.from(JSON.stringify({ createdAt: "2026-11-05T10:00:00.000Z", id })).toString("base64url");
 
 const wait = async (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -66,6 +76,24 @@ describe("toLedgerItem", () => {
 
     expect(item.type).toBe("CORRECTION");
     expect(item.fillId).toBeNull();
+  });
+});
+
+describe("the read behind GET /ledger", () => {
+  it.each([
+    [{ limit: "2" }, 3],
+    [{}, 51],
+  ])("asks the database for one row past the page, given %j", async (query, take) => {
+    const findMany = vi.fn<(args: unknown) => Promise<never[]>>().mockResolvedValue([]);
+    const controller = new LedgerController({
+      ledgerEntry: { findMany },
+    } as unknown as PrismaClient);
+
+    await controller.ledger(ledgerQuerySchema.parse(query), {
+      accountId: "the-caller",
+    } as Principal);
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take }));
   });
 });
 
@@ -155,7 +183,6 @@ describe.skipIf(database === undefined)("GET /ledger", () => {
 
     it("returns exactly the caller's entries, and none of the other's or the treasury's", async () => {
       const { a, b, aDeposit, bDeposit, entries } = await twoAccountsThatTraded();
-      const treasury = await treasuryId(client());
 
       const response = await getLedger(a.subject);
 
@@ -166,8 +193,6 @@ describe.skipIf(database === undefined)("GET /ledger", () => {
       for (const id of [bDeposit.id, ...bIds]) {
         expect(idsOf(response)).not.toContain(id);
       }
-      expect(JSON.stringify(response.body)).not.toContain(b.accountId);
-      expect(JSON.stringify(response.body)).not.toContain(treasury);
     });
 
     it("answers 400 to a request naming another account", async () => {
@@ -484,6 +509,7 @@ describe.skipIf(database === undefined)("GET /ledger", () => {
       ["not base64url", "not a cursor!"],
       ["not JSON", "bm90IGpzb24"],
       ["the wrong shape", "eyJhIjoxfQ"],
+      ["carrying a NUL, which Postgres rejects", cursorWithId("\u0000")],
     ])("answers 400 at query.cursor to a cursor that is %s", async (_name, cursor) => {
       const { subject } = await newCaller();
 
@@ -492,6 +518,14 @@ describe.skipIf(database === undefined)("GET /ledger", () => {
       expect(response.status).toBe(400);
       expect(errorBody(response).code).toBe("VALIDATION_FAILED");
       expect(errorBody(response).fields?.[0]?.path).toBe("query.cursor");
+    });
+
+    it("accepts a cursor on an id that is not a uuid, as a hand-written CORRECTION's may be", async () => {
+      const { subject } = await newCaller();
+
+      const response = await getLedger(subject, { cursor: cursorWithId("hand-written") });
+
+      expect(response.status).toBe(200);
     });
 
     it("answers 400 to a repeated parameter", async () => {

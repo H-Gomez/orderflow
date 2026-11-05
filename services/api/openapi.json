@@ -204,14 +204,14 @@
             "required": false,
             "in": "query",
             "schema": { "type": "string", "format": "date-time" },
-            "description": "Exclusive, with an offset."
+            "description": "Exclusive, with an offset. At most millisecond precision, from year 1."
           },
           {
             "name": "from",
             "required": false,
             "in": "query",
             "schema": { "type": "string", "format": "date-time" },
-            "description": "Inclusive, with an offset."
+            "description": "Inclusive, with an offset. At most millisecond precision, from year 1."
           },
           {
             "name": "cursor",
