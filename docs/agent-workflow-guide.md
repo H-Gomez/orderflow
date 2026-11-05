@@ -60,7 +60,7 @@ Read first: /docs/domain/settlement.md, /docs/events.md#fill-event, ADR-005.
 
 ## Contract (what)
 
-- Consume `settlement.fifo` (MessageGroupId = accountId).
+- Consume `settlement.fifo` (MessageGroupId = instrument).
 - For each FillEvent: release the hold, write DEBIT/CREDIT pairs for BOTH
   counterparties in ONE Postgres transaction, keyed by fillId.
 - Emit `settlement-completed` via the outbox.
