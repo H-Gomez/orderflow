@@ -77,11 +77,11 @@ A materialised view, a cache, a "balance after" column on an entry, or a snapsho
 
 **Decision (#8).** M0 has three entry types and no others.
 
-| Type         | Written by                                                                                                       | Entries                                                                                                          |
-| ------------ | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `DEPOSIT`    | The seed script (#11), when an account is created or topped up                                                   | Treasury −X quote currency; destination account +X quote currency                                                |
-| `TRADE`      | A settled fill. In M0 the seed writes synthetic fills as proper pairs; from M2 the settlement worker writes them | Buyer −quote, buyer +base; seller +quote, seller −base. Four entries, two currencies, each currency sums to zero |
-| `CORRECTION` | A human, deliberately (§4)                                                                                       | Mirror of every entry in the transaction being reversed, referencing it                                          |
+| Type         | Written by                                                                                                       | Entries                                                                                                                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DEPOSIT`    | The seed script (#11), when an account is created or topped up                                                   | Treasury −X in currency C; destination account +X in currency C. C is the quote currency for a `USER`; for a `BOT`, one `DEPOSIT` per seeded currency, quote and base (accounts.md §6, D1) |
+| `TRADE`      | A settled fill. In M0 the seed writes synthetic fills as proper pairs; from M2 the settlement worker writes them | Buyer −quote, buyer +base; seller +quote, seller −base. Four entries, two currencies, each currency sums to zero                                                                           |
+| `CORRECTION` | A human, deliberately (§4)                                                                                       | Mirror of every entry in the transaction being reversed, referencing it                                                                                                                    |
 
 A `TRADE` writes the quote leg as price × quantity exactly (§7). Fees are not modelled in M0 (open question 4).
 
