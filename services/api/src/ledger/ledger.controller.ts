@@ -21,15 +21,13 @@ import { ZodPipe } from "../validation/zod.pipe.js";
 
 /**
  * Newest first. Every entry of a transaction shares its timestamp, so `id` breaks the ties. The id
- * is any text but a NUL, which Postgres rejects: the column is TEXT, and a CORRECTION written by hand
- * (ledger.md section 4) chooses its own id, which must not leave a walk stuck on a refused cursor.
+ * accepts any value the TEXT column can hold, so every stored row yields a cursor this route takes
+ * back: the uuid default is applied by the Prisma client, not by the database. Only a NUL is
+ * refused, because Postgres rejects it in text, which would be a 500.
  */
 const ledgerKeySchema = z.strictObject({
   createdAt: dateTimeSchema,
-  id: z
-    .string()
-    .min(1)
-    .refine((id) => !id.includes("\u0000")),
+  id: z.string().refine((id) => !id.includes("\u0000")),
 });
 
 export const ledgerQuerySchema = listQuerySchema(ledgerKeySchema, {

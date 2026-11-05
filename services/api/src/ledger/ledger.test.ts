@@ -428,6 +428,9 @@ describe.skipIf(database === undefined)("GET /ledger", () => {
       // The tie this test exists for: both entries of a transaction share a timestamp.
       expect(pair).toHaveLength(2);
       expect(pair[0]?.createdAt).toEqual(pair[1]?.createdAt);
+      // Ids can't be known in advance, so this only orders the two `postTransaction` returned. Their
+      // uuid v7 ids are lowercase hex with hyphens in the same places, so a code-unit sort here agrees
+      // with Postgres's collation on `id desc`.
       const tiedNewestFirst = pair
         .map((e) => e.id)
         .sort()
@@ -435,7 +438,9 @@ describe.skipIf(database === undefined)("GET /ledger", () => {
 
       const walked: string[] = [];
       let query: Record<string, string> = { limit: "1" };
-      for (;;) {
+      // Four entries, so ten pages means the cursor stopped advancing: fail rather than hang.
+      for (let page = 1; ; page += 1) {
+        expect(page, "the walk never reached a null nextCursor").toBeLessThanOrEqual(10);
         const response = await getLedger(buyer.subject, query);
         expect(response.status).toBe(200);
         expect(pageOf(response).items).toHaveLength(1);
