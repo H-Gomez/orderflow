@@ -41,11 +41,7 @@ Use a different transport for each traffic class rather than one bus:
   state change and the outgoing event in one Postgres transaction; a relay publishes outbox rows to
   the SNS FIFO topic `trade-events.fifo`, which fans out to subscriber queues including
   `settlement.fifo`. The topic is FIFO because a standard SNS topic cannot deliver to FIFO queues.
-- **Message group = instrument, end to end:** on `orders.fifo`, on `trade-events.fifo` and on
-  `settlement.fifo`. Ordering holds per book, and unrelated books proceed in parallel. Per-account
-  ordering is not required for settlement: each fill is self-contained, the hold already reserved the
-  funds, takes per-account, per-currency locks in packages/db (the implementation merged in #64; the rule itself is recorded in docs/domain/settlement.md when that story is specified in M1). This
-  supersedes any earlier "group = account" wording for settlement.
+- **Message group = instrument, end to end**: on orders.fifo, on trade-events.fifo and on settlement.fifo. Ordering holds per book, and unrelated books proceed in parallel. Per-account ordering is not required for settlement: each fill is self-contained, the hold has already reserved the funds, and the ledger API is idempotent on fill ID and takes per-account, per-currency locks in packages/db (the implementation merged in #64; the rule itself is recorded in docs/domain/settlement.md when that story is specified in M1). This supersedes any earlier “group = account” wording for settlement.
 - **Redis Streams** for external ticks from the feed ingestor to the index service, trimmed to a
   bounded length.
 - **Redis pub/sub** for the UI latency path into the WebSocket gateway, with sequence numbers so a
