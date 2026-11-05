@@ -45,8 +45,8 @@ export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly fields: readonly FieldError[] | undefined;
 
-  constructor(code: ApiErrorCode, fields?: readonly FieldError[]) {
-    super(code);
+  constructor(code: ApiErrorCode, fields?: readonly FieldError[], options?: ErrorOptions) {
+    super(code, options);
     this.name = "ApiError";
     this.code = code;
     this.fields = fields;

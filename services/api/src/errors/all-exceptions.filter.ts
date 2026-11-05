@@ -53,6 +53,16 @@ const toFailure = (exception: unknown): Failure => {
   return fromCode("INTERNAL_ERROR");
 };
 
+const describeForLog = (exception: unknown): string => {
+  if (!(exception instanceof Error)) {
+    return String(exception);
+  }
+  const stack = exception.stack ?? exception.message;
+  return exception.cause === undefined
+    ? stack
+    : `${stack}\ncaused by: ${describeForLog(exception.cause)}`;
+};
+
 /** Turns every failure into the one documented shape. The detail goes only to the server log. */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -70,7 +80,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // The path and not the URL: a query string is the caller's data.
       this.logger.error(
         `${correlationId} ${request.method} ${request.path} answered ${String(status)} ${code}`,
-        exception instanceof Error ? exception.stack : String(exception),
+        describeForLog(exception),
       );
     }
 

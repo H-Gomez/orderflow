@@ -1,13 +1,17 @@
 import { randomUUID } from "node:crypto";
 
 import { Body, Controller, Get, Param, Query } from "@nestjs/common";
-import type { INestApplication } from "@nestjs/common";
+import type { INestApplication, Type } from "@nestjs/common";
+import { ModulesContainer } from "@nestjs/core";
 import type { App } from "supertest/types.js";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { errorResponseSchema } from "../errors/error-response.js";
+import { HealthController } from "../health/health.controller.js";
+import { MeController } from "../me/me.controller.js";
+import { ProbeController } from "../testing/probe.controller.js";
 import { asPrismaClient, createTestApp, errorBody, stubPrisma } from "../testing/test-app.js";
 import { unparsedInputs } from "../testing/unparsed-inputs.js";
 
@@ -81,6 +85,21 @@ describe("zod at the boundary", () => {
     const response = await server().post("/probe/orders").send({ quantity: "5", extra: true });
 
     expect(response.status).toBe(400);
+  });
+});
+
+describe("every real route", () => {
+  it("parses all its input with a ZodPipe", async () => {
+    const app = await createTestApp(asPrismaClient(stubPrisma()));
+    const controllers = [...app.get(ModulesContainer).values()]
+      .flatMap((module) => [...module.controllers.values()])
+      .map((wrapper) => wrapper.metatype as Type)
+      .filter((controller) => controller !== ProbeController);
+
+    expect(controllers).toEqual(expect.arrayContaining([HealthController, MeController]));
+    expect(controllers.flatMap(unparsedInputs)).toEqual([]);
+
+    await app.close();
   });
 });
 
