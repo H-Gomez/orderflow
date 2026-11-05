@@ -6,5 +6,6 @@ packages:
 
 allowBuilds:
   "@prisma/engines": false
+  "@scarf/scarf": false
   "@swc/core": false
   prisma: false
