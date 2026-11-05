@@ -25,6 +25,8 @@ The agent workflow guide already plans the edge as Python (feed ingestor as Pyth
 service as Python) and notes that Python services use `pytest` and `ruff check` in place of the
 TypeScript checks. A policy is needed before those services are scaffolded.
 
+Source: docs/plan.md §3 (stack decisions) and §2 (polyglot judgement)
+
 ## Decision
 
 TypeScript is the default for every package and service. Python with FastAPI is allowed only for the

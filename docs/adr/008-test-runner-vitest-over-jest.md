@@ -17,6 +17,8 @@ property-based tests with fast-check. The API will be NestJS, whose CLI scaffold
 This ADR records the choice so the rule has a reason, and so a later proposal to switch can argue
 against something concrete.
 
+Source: CLAUDE.md test conventions and docs/plan.md §3
+
 ## Decision
 
 Use Vitest as the only test runner for TypeScript packages, with shared settings from

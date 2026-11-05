@@ -30,6 +30,8 @@ The published load targets are 500 RPS of sustained order placement, bursts of 2
 10,000 concurrent WebSocket clients. Tick rates are whatever the three venues send and are measured
 in M3.
 
+Source: docs/plan.md §3 (architecture, queue table, targets)
+
 ## Decision
 
 Use a different transport for each traffic class rather than one bus:
