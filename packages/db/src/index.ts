@@ -12,6 +12,7 @@ export {
   balanceOf,
   buyingPowerOf,
   displayScaleOf,
+  heldOf,
   placeHold,
   postTransaction,
 } from "./ledger/index.js";
