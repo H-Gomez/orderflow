@@ -1,11 +1,12 @@
-import { Body, Controller, Get, HttpException, Param, Post, Query } from "@nestjs/common";
-import { LedgerError } from "@orderflow/db";
-import type { LedgerErrorCode } from "@orderflow/db";
+import { Body, Controller, Get, HttpException, Inject, Param, Post, Query } from "@nestjs/common";
+import { ExactDecimal, LedgerError, Prisma, balanceOf } from "@orderflow/db";
+import type { LedgerErrorCode, PrismaClient } from "@orderflow/db";
 import { z } from "zod";
 
 import { CurrentPrincipal } from "../auth/current-principal.decorator.js";
 import type { Principal } from "../auth/principal.js";
 import { Public } from "../auth/public.decorator.js";
+import { PRISMA_CLIENT } from "../database/database.module.js";
 import { ZodPipe } from "../validation/zod.pipe.js";
 
 /** What a {@link LedgerError} message looks like in life: an id and an amount a client must not see. */
@@ -25,6 +26,27 @@ const OrderBody = z.strictObject({ quantity: z.string(), note: z.string().option
  */
 @Controller("probe")
 export class ProbeController {
+  constructor(@Inject(PRISMA_CLIENT) private readonly prisma: PrismaClient) {}
+
+  @Public()
+  @Get("money")
+  money(): unknown {
+    return {
+      exact: new ExactDecimal("0.00000001"),
+      prisma: new Prisma.Decimal("0.00000001"),
+      nested: { list: [new ExactDecimal("1.50"), { deep: new Prisma.Decimal("-2") }] },
+      when: new Date("2026-01-02T03:04:05.000Z"),
+      text: "untouched",
+      nothing: null,
+    };
+  }
+
+  @Public()
+  @Get("balance/:accountId")
+  async balance(@Param("accountId") accountId: string): Promise<{ balance: ExactDecimal }> {
+    return { balance: await balanceOf(this.prisma, accountId, "USD") };
+  }
+
   @Public()
   @Get("ledger-error/:code")
   ledgerError(@Param("code") code: string): never {

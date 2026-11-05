@@ -8,7 +8,7 @@ import { vi } from "vitest";
 import { AppModule } from "../app.module.js";
 import { setupApp } from "../app.setup.js";
 import type { AppConfig } from "../config/config.js";
-import { PRISMA_CLIENT } from "../database/database.module.js";
+import { DatabaseModule, PRISMA_CLIENT } from "../database/database.module.js";
 import type { ErrorResponse } from "../errors/error-response.js";
 
 import { ProbeController } from "./probe.controller.js";
@@ -44,7 +44,7 @@ export const createTestApp = async (
   config: AppConfig = testConfig(),
 ): Promise<INestApplication<App>> => {
   const module = await Test.createTestingModule({
-    imports: [AppModule.forRoot(config)],
+    imports: [AppModule.forRoot(config), DatabaseModule],
     controllers: [ProbeController],
   })
     .overrideProvider(PRISMA_CLIENT)
