@@ -23,6 +23,12 @@
       // caching is ever turned on.
       "env": ["CI", "DATABASE_URL"]
     },
+    // Rewrites services/api/openapi.json from the code. A test fails when the two differ.
+    "openapi": {
+      "dependsOn": ["build"],
+      "outputs": ["openapi.json"],
+      "cache": false
+    },
     "generate": {
       "outputs": ["src/generated/**"]
     }

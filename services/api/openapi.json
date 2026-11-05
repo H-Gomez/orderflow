@@ -1,0 +1,221 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_liveness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/LivenessResponse" } }
+            }
+          },
+          "429": {
+            "description": "Over the rate limit. See the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the limit resets.",
+                "schema": { "type": "integer" }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "500": {
+            "description": "Something went wrong. The body carries no detail.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        },
+        "summary": "Liveness",
+        "tags": ["Health"]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_readiness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ReadinessResponse" } }
+            }
+          },
+          "429": {
+            "description": "Over the rate limit. See the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the limit resets.",
+                "schema": { "type": "integer" }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "500": {
+            "description": "Something went wrong. The body carries no detail.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "503": {
+            "description": "A dependency is unavailable.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        },
+        "summary": "Readiness: the database answers",
+        "tags": ["Health"]
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "MeController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MeResponse" } }
+            }
+          },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "403": {
+            "description": "The token is valid, but its subject has no account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "429": {
+            "description": "Over the rate limit. See the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the limit resets.",
+                "schema": { "type": "integer" }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "500": {
+            "description": "Something went wrong. The body carries no detail.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "503": {
+            "description": "A dependency is unavailable.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "The authenticated caller's account",
+        "tags": ["Me"]
+      }
+    }
+  },
+  "info": {
+    "title": "OrderFlow API",
+    "description": "Every failure uses the ErrorResponse shape. All money is a Money string.",
+    "version": "0.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": { "bearer": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" } },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "BAD_REQUEST",
+              "VALIDATION_FAILED",
+              "INVALID_CURRENCY",
+              "UNAUTHENTICATED",
+              "FORBIDDEN",
+              "UNKNOWN_SUBJECT",
+              "TREASURY_HAS_NO_BUYING_POWER",
+              "NOT_FOUND",
+              "ACCOUNT_NOT_FOUND",
+              "REQUEST_REJECTED",
+              "RATE_LIMITED",
+              "INTERNAL_ERROR",
+              "AUTH_UNAVAILABLE",
+              "NOT_READY"
+            ]
+          },
+          "message": { "type": "string" },
+          "correlationId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "path": { "type": "string" }, "message": { "type": "string" } },
+              "required": ["path", "message"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["code", "message", "correlationId"],
+        "additionalProperties": false,
+        "description": "The shape of every failure."
+      },
+      "LivenessResponse": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "enum": ["ok"] } },
+        "required": ["status"],
+        "additionalProperties": false,
+        "description": "The process is up."
+      },
+      "MeResponse": {
+        "type": "object",
+        "properties": {
+          "accountId": { "type": "string" },
+          "type": { "type": "string", "enum": ["USER", "BOT", "TREASURY"] },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["accountId", "type", "createdAt"],
+        "additionalProperties": false,
+        "description": "The authenticated caller's account."
+      },
+      "Money": {
+        "type": "string",
+        "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$",
+        "description": "An exact decimal amount as a string, NUMERIC(38, 18). Never a JSON number, so precision survives, and never in exponent notation. It is not rounded to any display scale."
+      },
+      "ReadinessResponse": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "enum": ["ready"] } },
+        "required": ["status"],
+        "additionalProperties": false,
+        "description": "The database answered."
+      }
+    }
+  }
+}
