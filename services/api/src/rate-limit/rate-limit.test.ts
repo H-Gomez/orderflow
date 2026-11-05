@@ -15,6 +15,8 @@ import {
 import type { StubPrisma } from "../testing/test-app.js";
 import { TestOidc } from "../testing/test-oidc.js";
 
+import { PrincipalThrottlerGuard } from "./principal-throttler.guard.js";
+
 describe("rate limiting", () => {
   let oidc: TestOidc;
   let prisma: StubPrisma;
@@ -85,6 +87,32 @@ describe("rate limiting", () => {
     await authenticatedCall("alice");
 
     expect((await publicCall()).status).toBe(200);
+  });
+
+  it("keeps a public route on the IP budget even when the caller sends a valid token", async () => {
+    const token = await oidc.sign({ sub: "alice" });
+    const call = async () =>
+      request(app.getHttpServer()).get("/probe/public").set("Authorization", `Bearer ${token}`);
+
+    await call();
+    await call();
+
+    expect((await call()).status).toBe(429);
+    expect((await authenticatedCall("alice")).status).toBe(200);
+  });
+
+  it("keys public routes on the IP: another address has its own budget", () => {
+    const guard = Object.create(PrincipalThrottlerGuard.prototype) as {
+      getTracker: (request: { ip?: string; tokenSubject?: string }) => Promise<string>;
+    };
+
+    return Promise.all([
+      expect(guard.getTracker({ ip: "192.0.2.1" })).resolves.toBe("ip:192.0.2.1"),
+      expect(guard.getTracker({ ip: "192.0.2.2" })).resolves.toBe("ip:192.0.2.2"),
+      expect(guard.getTracker({ ip: "192.0.2.1", tokenSubject: "alice" })).resolves.toBe(
+        "subject:alice",
+      ),
+    ]);
   });
 
   it("shares one budget across a caller's routes", async () => {

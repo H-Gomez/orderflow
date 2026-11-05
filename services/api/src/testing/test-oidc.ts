@@ -7,11 +7,12 @@ import type { CryptoKey, JWK } from "jose";
 
 import type { AppConfig } from "../config/config.js";
 
-const ALG = "RS256";
+const DEFAULT_ALG = "RS256";
 const ISSUER = "https://issuer.test.invalid/";
 const AUDIENCE = "orderflow-test-audience";
 
 interface SigningKey {
+  readonly alg: string;
   readonly kid: string;
   readonly privateKey: CryptoKey;
   readonly publicJwk: JWK;
@@ -20,14 +21,15 @@ interface SigningKey {
 
 let keyCounter = 0;
 
-const newSigningKey = async (): Promise<SigningKey> => {
-  const { privateKey, publicKey } = await generateKeyPair(ALG, { extractable: true });
+const newSigningKey = async (alg = DEFAULT_ALG): Promise<SigningKey> => {
+  const { privateKey, publicKey } = await generateKeyPair(alg, { extractable: true });
   keyCounter += 1;
   const kid = `test-key-${String(keyCounter)}`;
   return {
+    alg,
     kid,
     privateKey,
-    publicJwk: { ...(await exportJWK(publicKey)), kid, alg: ALG, use: "sig" },
+    publicJwk: { ...(await exportJWK(publicKey)), kid, alg, use: "sig" },
     publicPem: await exportSPKI(publicKey),
   };
 };
@@ -39,6 +41,8 @@ export interface TokenOptions {
   /** Seconds since the epoch. `null` leaves the claim out. */
   readonly expiresAt?: number | null;
   readonly key?: SigningKey;
+  /** Extra claims, set as given, including ones the builder's setters would refuse. */
+  readonly claims?: Record<string, unknown>;
 }
 
 const inAnHour = (): number => Math.floor(Date.now() / 1_000) + 3_600;
@@ -54,6 +58,9 @@ export class TestOidc {
   /** How many times the JWKS has been fetched. */
   fetchCount = 0;
 
+  /** Served alongside the current key. */
+  private readonly extraKeys: SigningKey[] = [];
+
   private constructor(
     private readonly server: Server,
     private current: SigningKey,
@@ -65,7 +72,9 @@ export class TestOidc {
     server.on("request", (_request, response) => {
       oidc.fetchCount += 1;
       response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ keys: [oidc.current.publicJwk] }));
+      response.end(
+        JSON.stringify({ keys: [oidc.current, ...oidc.extraKeys].map((key) => key.publicJwk) }),
+      );
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     return oidc;
@@ -94,15 +103,27 @@ export class TestOidc {
   }
 
   /** A key that is not, and never was, in the JWKS. */
-  foreignKey = newSigningKey;
+  foreignKey = async (): Promise<SigningKey> => newSigningKey();
+
+  /** A different private key claiming the published key's id, so only the signature can fail. */
+  async impostorKey(): Promise<SigningKey> {
+    return { ...(await newSigningKey()), kid: this.current.kid };
+  }
+
+  /** Publishes a further key, using any algorithm. */
+  async publishKey(alg: string): Promise<SigningKey> {
+    const key = await newSigningKey(alg);
+    this.extraKeys.push(key);
+    return key;
+  }
 
   async sign(options: TokenOptions = {}): Promise<string> {
     const key = options.key ?? this.current;
     const expiresAt = options.expiresAt === undefined ? inAnHour() : options.expiresAt;
     const sub = options.sub === undefined ? "subject-under-test" : options.sub;
 
-    let jwt = new SignJWT({})
-      .setProtectedHeader({ alg: ALG, kid: key.kid })
+    let jwt = new SignJWT({ ...options.claims })
+      .setProtectedHeader({ alg: key.alg, kid: key.kid })
       .setIssuer(options.issuer ?? ISSUER)
       .setAudience(options.audience ?? AUDIENCE)
       .setIssuedAt();

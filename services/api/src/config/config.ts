@@ -15,15 +15,20 @@ const environmentSchema = z.object({
   DATABASE_URL: z.url(),
   OIDC_ISSUER: z.string().min(1),
   OIDC_AUDIENCE: z.string().min(1),
-  OIDC_JWKS_URI: z.url().refine(isHttpsOrLoopback, "must be https, or http on a loopback address"),
+  OIDC_JWKS_URI: z
+    .url({ abort: true })
+    .refine(isHttpsOrLoopback, "must be https, or http on a loopback address"),
   /** A key the issuer has withdrawn stops working at most this long after it is withdrawn. */
   OIDC_JWKS_CACHE_TTL_SECONDS: z.coerce.number().int().min(1).max(86_400).default(600),
-  /** The shortest gap between refetches that a token with an unknown key id can trigger. */
-  OIDC_JWKS_COOLDOWN_SECONDS: z.coerce.number().int().min(0).max(3_600).default(30),
+  /**
+   * The shortest gap between refetches that a token with an unknown key id can trigger. At least 1:
+   * invalid tokens are not rate limited, so 0 would let any caller drive a fetch per request.
+   */
+  OIDC_JWKS_COOLDOWN_SECONDS: z.coerce.number().int().min(1).max(3_600).default(30),
   RATE_LIMIT_WINDOW_SECONDS: positiveInt(60),
   RATE_LIMIT_AUTHENTICATED: positiveInt(120),
   RATE_LIMIT_PUBLIC: positiveInt(60),
-  PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
+  PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
 });
 
 /** The service's configuration. Nothing else in the service reads `process.env`. */

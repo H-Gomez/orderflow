@@ -18,18 +18,18 @@ The API docs are at `/docs`, with the JSON at `/docs-json`.
 
 Every variable is validated at boot. Invalid config exits 1 and names the variables, never their values, and nothing else in the service reads `process.env`.
 
-| Variable                      | Required | Default | Meaning                                                                     |
-| ----------------------------- | -------- | ------- | --------------------------------------------------------------------------- |
-| `DATABASE_URL`                | Yes      |         | Postgres connection string.                                                 |
-| `OIDC_ISSUER`                 | Yes      |         | The `iss` every token must carry.                                           |
-| `OIDC_AUDIENCE`               | Yes      |         | The `aud` every token must carry.                                           |
-| `OIDC_JWKS_URI`               | Yes      |         | The issuer's key set. Must be https, or http on a loopback address.         |
-| `OIDC_JWKS_CACHE_TTL_SECONDS` | No       | 600     | How long fetched keys are trusted. At most 86400.                           |
-| `OIDC_JWKS_COOLDOWN_SECONDS`  | No       | 30      | The shortest gap between refetches an unknown key id can trigger.           |
-| `RATE_LIMIT_WINDOW_SECONDS`   | No       | 60      | The rate limit window.                                                      |
-| `RATE_LIMIT_AUTHENTICATED`    | No       | 120     | Requests per window for each authenticated subject.                         |
-| `RATE_LIMIT_PUBLIC`           | No       | 60      | Requests per window for each IP on public routes. Health probes count here. |
-| `PORT`                        | No       | 3000    | The listening port.                                                         |
+| Variable                      | Required | Default | Meaning                                                                       |
+| ----------------------------- | -------- | ------- | ----------------------------------------------------------------------------- |
+| `DATABASE_URL`                | Yes      |         | Postgres connection string.                                                   |
+| `OIDC_ISSUER`                 | Yes      |         | The `iss` every token must carry.                                             |
+| `OIDC_AUDIENCE`               | Yes      |         | The `aud` every token must carry.                                             |
+| `OIDC_JWKS_URI`               | Yes      |         | The issuer's key set. Must be https, or http on a loopback address.           |
+| `OIDC_JWKS_CACHE_TTL_SECONDS` | No       | 600     | How long fetched keys are trusted. At most 86400.                             |
+| `OIDC_JWKS_COOLDOWN_SECONDS`  | No       | 30      | The shortest gap between refetches an unknown key id can trigger. At least 1. |
+| `RATE_LIMIT_WINDOW_SECONDS`   | No       | 60      | The rate limit window.                                                        |
+| `RATE_LIMIT_AUTHENTICATED`    | No       | 120     | Requests per window for each authenticated subject.                           |
+| `RATE_LIMIT_PUBLIC`           | No       | 60      | Requests per window for each IP on public routes. Health probes count here.   |
+| `PORT`                        | No       | 3000    | The listening port.                                                           |
 
 `OIDC_JWKS_COOLDOWN_SECONDS` is an addition beyond the #10 contract. It bounds how often unknown key ids can make the service refetch the JWKS, so it also sets how quickly a rotated key is picked up, and the rotation test needs it set low.
 

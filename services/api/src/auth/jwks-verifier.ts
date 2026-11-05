@@ -53,7 +53,8 @@ export class JwksVerifier {
         algorithms: ALGORITHMS,
         requiredClaims: REQUIRED_CLAIMS,
       });
-      if (payload.sub === undefined || payload.sub === "") {
+      // jose checks `sub` is present, not that it is a string.
+      if (typeof payload.sub !== "string" || payload.sub === "") {
         throw new ApiError("UNAUTHENTICATED");
       }
       return payload.sub;

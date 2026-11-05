@@ -49,7 +49,37 @@ describe("authentication, with no database behind it", () => {
   const rejected: readonly (readonly [string, () => Promise<string>])[] = [
     ["a malformed token", async () => Promise.resolve("not-a-jwt")],
     ["a token of three garbage segments", async () => Promise.resolve("aaa.bbb.ccc")],
-    ["a token signed by the wrong key", async () => oidc.sign({ key: await oidc.foreignKey() })],
+    [
+      "a token signed by a key not in the JWKS",
+      async () => oidc.sign({ key: await oidc.foreignKey() }),
+    ],
+    [
+      "a token signed by the wrong key under the published key id",
+      async () => oidc.sign({ key: await oidc.impostorKey() }),
+    ],
+    [
+      "a correctly signed token whose payload was then changed",
+      async () => {
+        const [header, , signature] = (await oidc.sign()).split(".");
+        const forged = Buffer.from(
+          JSON.stringify({
+            sub: "someone-else",
+            iss: oidc.config().issuer,
+            aud: oidc.config().audience,
+            exp: Math.floor(Date.now() / 1_000) + 3_600,
+          }),
+        ).toString("base64url");
+        return `${String(header)}.${forged}.${String(signature)}`;
+      },
+    ],
+    [
+      "an algorithm outside the allowlist, on a published key",
+      async () => oidc.sign({ key: await oidc.publishKey("RS384") }),
+    ],
+    [
+      "a token whose sub is not a string",
+      async () => oidc.sign({ sub: null, claims: { sub: 123 } }),
+    ],
     ["an expired token", async () => oidc.sign({ expiresAt: inThePast() })],
     ["the wrong issuer", async () => oidc.sign({ issuer: "https://other.test.invalid/" })],
     ["the wrong audience", async () => oidc.sign({ audience: "some-other-api" })],
@@ -98,6 +128,17 @@ describe("authentication, with no database behind it", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ accountId: "account-1" });
+  });
+
+  it("accepts ES256, the other allowed algorithm", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      account: { id: "account-1", type: AccountType.USER, createdAt: new Date() },
+    });
+
+    const response = await whoami(await oidc.sign({ key: await oidc.publishKey("ES256") }));
+
+    expect(response.status).toBe(200);
   });
 
   it.each([

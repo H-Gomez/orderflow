@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 
+// A devDependency: this and emit.ts are build tooling, and main.ts never reaches them.
 import { format, resolveConfig } from "prettier";
 
 import { buildOpenApiDocument } from "./document.js";

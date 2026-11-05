@@ -66,6 +66,26 @@ describe("parseConfig", () => {
     );
   });
 
+  it.each(["not-a-url", "", "http//missing-colon"])(
+    "names OIDC_JWKS_URI, and does not crash, when it is %j",
+    (value) => {
+      const error = failure({ ...valid, OIDC_JWKS_URI: value });
+
+      expect(error.variables).toEqual(["OIDC_JWKS_URI"]);
+      expect(value === "" || !error.message.includes(value)).toBe(true);
+    },
+  );
+
+  it("refuses a JWKS cooldown of 0, which would allow a fetch per request", () => {
+    expect(failure({ ...valid, OIDC_JWKS_COOLDOWN_SECONDS: "0" }).variables).toEqual([
+      "OIDC_JWKS_COOLDOWN_SECONDS",
+    ]);
+  });
+
+  it("refuses an empty PORT rather than listening on a random one", () => {
+    expect(failure({ ...valid, PORT: "" }).variables).toEqual(["PORT"]);
+  });
+
   it("keeps the JWKS cache TTL bounded", () => {
     expect(failure({ ...valid, OIDC_JWKS_CACHE_TTL_SECONDS: "86401" }).variables).toEqual([
       "OIDC_JWKS_CACHE_TTL_SECONDS",
