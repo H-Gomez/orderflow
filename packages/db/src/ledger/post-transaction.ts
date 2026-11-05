@@ -29,7 +29,7 @@ export interface LedgerEntryInput {
 
 export interface PostTransactionInput {
   readonly type: EntryType;
-  /** The transaction's cause: the fill id for a trade, the seed run and account for a deposit. */
+  /** The transaction's cause: the fill id for a trade, the seed run, account and currency for a deposit. */
   readonly causeKey: string;
   readonly entries: readonly LedgerEntryInput[];
 }

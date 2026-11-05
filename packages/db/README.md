@@ -140,7 +140,7 @@ const db = createPrismaClient();
 
 await postTransaction(db, {
   type: EntryType.DEPOSIT,
-  causeKey: `seed:${runId}:${accountId}`,
+  causeKey: `seed:${runId}:${accountId}:USD`,
   entries: [
     { accountId: treasuryId, currency: "USD", amount: "-10000" },
     { accountId, currency: "USD", amount: "10000" },

@@ -114,8 +114,8 @@ model Instrument {
 /// the same type" (ledger.md section 1) structural rather than a convention.
 ///
 /// `causeKey` is the transaction's cause: the fill id for a trade, the seed run plus account
-/// for a deposit. It is unique, so re-posting the same cause is a no-op that succeeds, which
-/// is how idempotency on event ID reaches the ledger (ledger.md section 3).
+/// plus currency for a deposit. It is unique, so re-posting the same cause is a no-op that
+/// succeeds, which is how idempotency on event ID reaches the ledger (ledger.md section 3).
 ///
 /// `correctsTransactionId` is set only by a CORRECTION and points at the transaction it
 /// mirrors. The wrong transaction itself is never touched (ledger.md section 4).
