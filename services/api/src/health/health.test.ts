@@ -1,3 +1,6 @@
+import { createServer } from "node:net";
+import type { AddressInfo, Socket } from "node:net";
+
 import { Logger } from "@nestjs/common";
 import type { INestApplication } from "@nestjs/common";
 import { createPrismaClient } from "@orderflow/db";
@@ -5,12 +8,12 @@ import { createTestDatabase } from "@orderflow/db/testing";
 import type { TestDatabase } from "@orderflow/db/testing";
 import type { App } from "supertest/types.js";
 import request from "supertest";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { errorResponseSchema } from "../errors/error-response.js";
 import { asPrismaClient, createTestApp, errorBody, stubPrisma } from "../testing/test-app.js";
 
-import { HealthController, READINESS_TIMEOUT_MS } from "./health.controller.js";
+import { READINESS_TIMEOUT_MS } from "./health.controller.js";
 
 const UNREACHABLE = "postgresql://user:password@127.0.0.1:1/unreachable";
 
@@ -44,31 +47,53 @@ describe("with a database that cannot be reached", () => {
   });
 });
 
-describe("with a stubbed client", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+describe("with a stubbed client that offers no query at all", () => {
+  it("GET /health answers without touching the database", async () => {
+    const app = await createTestApp(asPrismaClient(stubPrisma()));
 
-  it("GET /health does not touch the database", async () => {
-    const prisma = stubPrisma();
-    const app = await createTestApp(asPrismaClient(prisma));
+    const response = await request(app.getHttpServer()).get("/health");
 
-    await request(app.getHttpServer()).get("/health");
-
-    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
     await app.close();
   });
+});
 
-  it("readiness gives up on a database that never answers", async () => {
-    vi.useFakeTimers();
-    const prisma = stubPrisma();
-    prisma.$queryRaw.mockReturnValue(new Promise(() => undefined));
-    const controller = new HealthController(asPrismaClient(prisma));
+describe("with a database host that accepts connections and never answers", () => {
+  const sockets = new Set<Socket>();
+  const silent = createServer((socket) => {
+    sockets.add(socket);
+    socket.on("error", () => undefined);
+  });
+  let app: INestApplication<App>;
 
-    const readiness = expect(controller.readiness()).rejects.toMatchObject({ code: "NOT_READY" });
-    await vi.advanceTimersByTimeAsync(READINESS_TIMEOUT_MS);
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => silent.listen(0, "127.0.0.1", resolve));
+    const { port } = silent.address() as AddressInfo;
+    app = await createTestApp(
+      createPrismaClient({
+        connectionString: `postgresql://user:password@127.0.0.1:${String(port)}/silent`,
+      }),
+    );
+  });
 
-    await readiness;
+  afterAll(async () => {
+    for (const socket of sockets) {
+      socket.destroy();
+    }
+    await app.close();
+    await new Promise((resolve) => silent.close(resolve));
+  });
+
+  it("GET /health/ready gives up at the timeout rather than hanging the probe", async () => {
+    vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    const startedAt = Date.now();
+
+    const response = await request(app.getHttpServer()).get("/health/ready");
+
+    expect(response.status).toBe(503);
+    expect(errorBody(response).code).toBe("NOT_READY");
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(READINESS_TIMEOUT_MS - 50);
+    expect(Date.now() - startedAt).toBeLessThan(READINESS_TIMEOUT_MS + 1_500);
   });
 });
 

@@ -30,7 +30,6 @@ export const testConfig = (overrides: Partial<AppConfig> = {}): AppConfig => ({
 /** A client that fails a test by being asked for anything it was not given. */
 export const stubPrisma = () => ({
   $disconnect: vi.fn<() => Promise<void>>().mockResolvedValue(),
-  $queryRaw: vi.fn<() => Promise<unknown>>().mockResolvedValue([{ "?column?": 1 }]),
   user: { findUnique: vi.fn<() => Promise<unknown>>().mockResolvedValue(null) },
 });
 
