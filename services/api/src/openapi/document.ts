@@ -10,6 +10,7 @@ import { errorResponseSchema } from "../errors/error-response.js";
 import { livenessResponseSchema, readinessResponseSchema } from "../health/health.controller.js";
 import { meResponseSchema } from "../me/me.controller.js";
 import { moneySchema } from "../money/money.js";
+import { portfolioResponseSchema } from "../portfolio/portfolio.controller.js";
 
 type ComponentSchema = NonNullable<NonNullable<OpenAPIObject["components"]>["schemas"]>[string];
 
@@ -31,6 +32,10 @@ const COMPONENTS = {
   Money: componentSchema(
     moneySchema,
     "An exact decimal amount as a string, NUMERIC(38, 18). Never a JSON number, so precision survives, and never in exponent notation. It is not rounded to any display scale.",
+  ),
+  PortfolioResponse: componentSchema(
+    portfolioResponseSchema,
+    "The caller's balance, held amount and buying power in each currency with a non-zero balance, ordered by currency code.",
   ),
   ReadinessResponse: componentSchema(readinessResponseSchema, "The database answered."),
 };

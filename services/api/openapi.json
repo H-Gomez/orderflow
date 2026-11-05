@@ -127,6 +127,66 @@
         "summary": "The authenticated caller's account",
         "tags": ["Me"]
       }
+    },
+    "/portfolio": {
+      "get": {
+        "description": "One row per currency with a non-zero balance, ordered by currency code. Each figure is a separate read, not one snapshot, so a concurrent write can make them disagree. M0 has no API write path, so this is accepted.",
+        "operationId": "PortfolioController_portfolio",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PortfolioResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request failed validation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "403": {
+            "description": "The token is valid, but its subject has no account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "429": {
+            "description": "Over the rate limit. See the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the limit resets.",
+                "schema": { "type": "integer" }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "500": {
+            "description": "Something went wrong. The body carries no detail.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "503": {
+            "description": "A dependency is unavailable.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "The authenticated caller's balances, holds and buying power",
+        "tags": ["Portfolio"]
+      }
     }
   },
   "info": {
@@ -208,6 +268,28 @@
         "type": "string",
         "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$",
         "description": "An exact decimal amount as a string, NUMERIC(38, 18). Never a JSON number, so precision survives, and never in exponent notation. It is not rounded to any display scale."
+      },
+      "PortfolioResponse": {
+        "type": "object",
+        "properties": {
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": { "type": "string" },
+                "balance": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "held": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "buyingPower": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" }
+              },
+              "required": ["currency", "balance", "held", "buyingPower"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["currencies"],
+        "additionalProperties": false,
+        "description": "The caller's balance, held amount and buying power in each currency with a non-zero balance, ordered by currency code."
       },
       "ReadinessResponse": {
         "type": "object",

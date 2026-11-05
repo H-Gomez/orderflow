@@ -12,6 +12,7 @@ import { AllExceptionsFilter } from "./errors/all-exceptions.filter.js";
 import { HealthController } from "./health/health.controller.js";
 import { MeController } from "./me/me.controller.js";
 import { MoneyInterceptor } from "./money/money.interceptor.js";
+import { PortfolioController } from "./portfolio/portfolio.controller.js";
 import { PrincipalThrottlerGuard } from "./rate-limit/principal-throttler.guard.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 
@@ -21,7 +22,7 @@ export class AppModule {
     return {
       module: AppModule,
       imports: [ConfigModule.forRoot(config), DatabaseModule, AuthModule, RateLimitModule],
-      controllers: [HealthController, MeController],
+      controllers: [HealthController, MeController, PortfolioController],
       providers: [
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
         { provide: APP_INTERCEPTOR, useClass: MoneyInterceptor },
