@@ -44,7 +44,7 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 - Formatting: Prettier. Check with `pnpm format:check` and fix with `pnpm format`.
 - Tests sit next to the code as `*.test.ts`.
 - Commits use Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`).
-- Language policy: [/docs/adr/002-language-policy.md](/docs/adr/002-language-policy.md). Architecture beyond the layout above: [docs/adr/001-architecture-queues-as-backbone.md](docs/adr/001-architecture-queues-as-backbone.md).
+- Language policy: TBD ([ADR-002](docs/adr/README.md)). Architecture beyond the layout above: TBD (ADR-001).
 - Agent comments on issues and PRs, review summaries and PR-body prose follow [docs/conventions/agent-comments.md](docs/conventions/agent-comments.md).
   Check a body with `pnpm lint:comment`.
 - Decisions are recorded as ADRs in [docs/adr/](docs/adr/README.md). Lessons go in [LEARNINGS.md](LEARNINGS.md).
