@@ -95,8 +95,8 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[] | select(.status != "removed") | .filename' \
-            | grep -vxF -e 'services/api/openapi.json' -e 'pnpm-lock.yaml' || true)"
+          all_files="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[] | select(.status != "removed") | .filename')"
+          changed="$(grep -vxF -e 'services/api/openapi.json' -e 'pnpm-lock.yaml' <<<"$all_files" || true)"
           bodies="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
             --jq '.[] | select(.user.login == "github-actions[bot]" and .updated_at >= env.STARTED) | .body | @json')"
           found=0
