@@ -63,7 +63,7 @@ jobs:
           prompt: |
             Review this pull request. Your one required output is a summary written with the update_claude_comment tool. Inline review comments are optional, for detail on a specific line only, and never a substitute for the summary.
 
-            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks where one line applies, or a short subject where none does. Always end the folded notes with one line that starts "Files read:" and continues on the same line with every changed file you read, whether or not you have findings, then say what you checked in each file in the folded notes, above that line.
+            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks where one line applies, or a short subject where none does. Whether or not you have findings, end the folded notes with two lines, in this order, with a blank line between them: one that starts "Not checked:" and names anything you did not read or run (or "Not checked: nothing"), then one that starts "Files read:" followed on the same line by every changed file you read, as exact repository paths separated by commas, with nothing else on that line. Above those two lines, say what you checked in each file.
 
             Check, in this order:
 
@@ -74,7 +74,7 @@ jobs:
 
             Write one summary with the update_claude_comment tool, in the format in docs/conventions/agent-comments.md:
             - line 1: a bold status word (ACTION NEEDED if anything blocks, otherwise FYI)
-            - line 2: what the human must do, in at most 30 words
+            - line 2: what the human must do, in at most 20 words
             - line 3: Reviewed at <the first 7 characters of ${{ github.event.pull_request.head.sha }}>
             - line 4: Findings: N high, N medium, N low (or "No findings.")
             - then at most 5 finding bullets, everything else folded in <details>.
@@ -84,9 +84,9 @@ jobs:
             Never approve this pull request and never request changes as a formal review verdict. Comments only. Do not edit any file.
 
       # A required check that can pass with no output is not a control. The
-      # fresh comment must carry the status line, this run's head commit,
-      # evidence of reading (a path:line finding or a "Files read:" line), and
-      # the name of every changed file except the generated ones.
+      # fresh comment must carry the status line, this run's head commit, and
+      # a "Files read:" line that lists every changed file except the
+      # generated ones.
       - name: Fail if the review posted no real summary
         env:
           GH_TOKEN: ${{ github.token }}
@@ -95,8 +95,7 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename' \
-            | grep -vxF -e 'services/api/openapi.json' -e 'pnpm-lock.yaml' || true)"
+          changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[] | select(.status != "removed") | .filename' \
           bodies="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
             --jq '.[] | select(.user.login == "github-actions[bot]" and .updated_at >= env.STARTED) | .body | @json')"
           found=0

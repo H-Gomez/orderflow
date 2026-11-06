@@ -61,7 +61,7 @@ Each finding is one bullet, highest severity first, in this form:
 
 `Severity = **<severity>**: <location> - <problem>`
 
-- **Location:** `path:line`, linked to the file at the reviewed commit, or a short subject such as "Scope" when no single line applies.
+- **Location:** `path:line` in backticks, or a short subject such as "Scope" when no single line applies.
 - **Problem:** one sentence of at most 30 words saying what is wrong and why it matters. The detail goes in the inline comment on that line and in the folded notes.
 
 With more than 5 findings, the 5 most severe are bullets and the rest go in the folded notes.
