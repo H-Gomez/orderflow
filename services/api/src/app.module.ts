@@ -16,6 +16,7 @@ import { MoneyInterceptor } from "./money/money.interceptor.js";
 import { PortfolioController } from "./portfolio/portfolio.controller.js";
 import { PrincipalThrottlerGuard } from "./rate-limit/principal-throttler.guard.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
+import { TradesController } from "./trades/trades.controller.js";
 
 @Module({})
 export class AppModule {
@@ -23,7 +24,13 @@ export class AppModule {
     return {
       module: AppModule,
       imports: [ConfigModule.forRoot(config), DatabaseModule, AuthModule, RateLimitModule],
-      controllers: [HealthController, MeController, PortfolioController, LedgerController],
+      controllers: [
+        HealthController,
+        MeController,
+        PortfolioController,
+        LedgerController,
+        TradesController,
+      ],
       providers: [
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
         { provide: APP_INTERCEPTOR, useClass: MoneyInterceptor },

@@ -12,6 +12,7 @@ import { ledgerPageSchema } from "../ledger/ledger.controller.js";
 import { meResponseSchema } from "../me/me.controller.js";
 import { moneySchema } from "../money/money.js";
 import { portfolioResponseSchema } from "../portfolio/portfolio.controller.js";
+import { tradesPageSchema } from "../trades/trades.controller.js";
 
 type ComponentSchema = NonNullable<NonNullable<OpenAPIObject["components"]>["schemas"]>[string];
 
@@ -44,6 +45,10 @@ const COMPONENTS = {
     "The caller's balance, held amount and buying power in each currency with a non-zero balance, ordered by currency code.",
   ),
   ReadinessResponse: componentSchema(readinessResponseSchema, "The database answered."),
+  TradesPage: componentSchema(
+    tradesPageSchema,
+    "One page of the caller's fills, one row per side the caller was on, newest first. nextCursor is null on the last page.",
+  ),
 };
 
 /** The OpenAPI document for an application, with the named components added. */

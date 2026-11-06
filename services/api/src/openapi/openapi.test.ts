@@ -45,6 +45,7 @@ describe("the committed OpenAPI document", () => {
       "/ledger",
       "/me",
       "/portfolio",
+      "/trades",
     ]);
   });
 
@@ -54,6 +55,7 @@ describe("the committed OpenAPI document", () => {
     expect(paths["/me"]?.get?.security).toEqual([{ bearer: [] }]);
     expect(paths["/portfolio"]?.get?.security).toEqual([{ bearer: [] }]);
     expect(paths["/ledger"]?.get?.security).toEqual([{ bearer: [] }]);
+    expect(paths["/trades"]?.get?.security).toEqual([{ bearer: [] }]);
     expect(paths["/health"]?.get?.security).toBeUndefined();
     expect(paths["/health/ready"]?.get?.security).toBeUndefined();
   });
