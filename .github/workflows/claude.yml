@@ -27,7 +27,6 @@ jobs:
     # money, and orderflow-agent must not trigger a run either.
     # No label trigger: agent-ready is a state, not a command. Starting a
     # story from CI is not wired yet; see the backlog issue.
-    # Every comment the review bot posts fires this event too; the actor check
     # skips it, and the skipped run in the Actions list is expected.
     if: >-
       github.actor == 'H-Gomez' &&
@@ -41,12 +40,15 @@ jobs:
           fetch-depth: 0
 
       - name: Run Claude Code
-        uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1.0.231
+        uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          settings: |
+            {"env": {"ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-5-5"}}
           # Without --allowedTools the action runs in automation mode with no
           # shell and no GitHub access, so it can only produce text.
           claude_args: >-
+            --model claude-sonnet-5-5
             --max-turns 30
             --allowedTools "Bash,Read,Write,Edit,Glob,Grep"
             --append-system-prompt "Every comment you post on an issue or PR follows docs/conventions/agent-comments.md. Read it first."
