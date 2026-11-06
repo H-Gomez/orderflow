@@ -54,11 +54,6 @@ const limitSchema = z
   .pipe(z.int().min(1).max(MAX_LIMIT))
   .default(DEFAULT_LIMIT);
 
-interface TimeWindow {
-  readonly from?: Date | undefined;
-  readonly to?: Date | undefined;
-}
-
 /**
  * A list endpoint's whole query: `limit`, `cursor`, `from` and `to`, plus the endpoint's own filters.
  * A factory because the cursor decodes to the endpoint's sort key. `cursor` comes out as that key, and
@@ -86,9 +81,10 @@ export const listQuerySchema = <Key extends z.ZodType, Filters extends z.ZodRawS
       to: dateTimeSchema.optional(),
       ...filters,
     })
-    .superRefine((query, context) => {
-      const { from, to } = query as TimeWindow;
-      if (from !== undefined && to !== undefined && from.getTime() >= to.getTime()) {
+    .superRefine((query: Readonly<Record<string, unknown>>, context) => {
+      // A bound that failed its own schema is still its raw string here, because zod runs this anyway.
+      const { from, to } = query;
+      if (from instanceof Date && to instanceof Date && from.getTime() >= to.getTime()) {
         context.addIssue({ code: "custom", path: ["to"], message: "Must be later than from" });
       }
     });

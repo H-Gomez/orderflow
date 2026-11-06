@@ -106,6 +106,18 @@ describe("the query schema", () => {
     expect(issuePaths({ to: "2026-11-05T10:00:00.123Z" })).toEqual([]);
   });
 
+  it("reports an invalid from beside a valid to at from, without throwing", () => {
+    expect(issuePaths({ from: "2026-11-05T10:00:00.1234Z", to: "2026-11-05T11:00:00Z" })).toEqual([
+      "from",
+    ]);
+  });
+
+  it("reports an invalid to beside a valid from at to, without throwing", () => {
+    expect(issuePaths({ from: "2026-11-05T10:00:00Z", to: "2026-11-05T11:00:00.1234Z" })).toEqual([
+      "to",
+    ]);
+  });
+
   it("rejects an unknown parameter at the object's own path", () => {
     const parsed = querySchema.safeParse({ accountId: ID });
 

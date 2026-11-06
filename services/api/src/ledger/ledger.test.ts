@@ -346,6 +346,19 @@ describe.skipIf(database === undefined)("GET /ledger", () => {
       expect(errorBody(response).fields?.[0]?.path).toBe("query.to");
     });
 
+    it("answers 400 at query.from, never 500, to an invalid from beside a valid to", async () => {
+      const { subject } = await newCaller();
+
+      const response = await getLedger(subject, {
+        from: "2026-11-05T10:00:00.1234Z",
+        to: "2026-11-05T11:00:00Z",
+      });
+
+      expect(response.status).toBe(400);
+      expect(errorBody(response).code).toBe("VALIDATION_FAILED");
+      expect(errorBody(response).fields?.[0]?.path).toBe("query.from");
+    });
+
     // These reach Postgres unless the schema stops them, and Postgres rejects year 0 with a 500.
     it.each(["0000-01-01T00:00:00Z", "0001-01-01T00:00:00+14:00"])(
       "answers 400, never 500, to the date %s before year 1",
