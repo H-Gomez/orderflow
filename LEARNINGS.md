@@ -10,6 +10,7 @@ what happened, why, and what we now do differently. Promote a lesson to CLAUDE.m
 **Cause.** Setting `prompt` puts the action in agent mode, which creates no tracking comment. The prompt told the model to write its summary with `update_claude_comment`, but there was no comment to update, so the summary went nowhere. The run still ended in success.
 
 **Fix**
+
 - Action pinned to v1.0.268 (`c0949c5`), which installs Claude Code 2.1.318.
 - `track_progress: true`, so the action creates a tracking comment for the model to update.
 - `--model claude-sonnet-5-5` in both workflows, and `claude-haiku-5-5` for background work through the `settings` env block.
