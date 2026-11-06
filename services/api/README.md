@@ -75,7 +75,7 @@ In OpenAPI, reference the `Money` component for any amount.
 
 ## Pagination
 
-Every list endpoint uses one scheme, from [src/pagination/](src/pagination/pagination.ts). It is keyset, never offset, so a row written between two pages neither repeats nor skips a row.
+Every list endpoint uses one scheme, from [src/pagination/](src/pagination/pagination.ts). It is keyset, never offset, so a row written after a page was read never makes the next page repeat or skip a row. A walk is still not a snapshot: `createdAt` is set when a transaction starts, so a row whose transaction started before a page was read and committed after it can be missed. M0 has no concurrent API writer, and M2's consumers read the outbox, not these endpoints.
 
 | Parameter | Meaning                                                                                      |
 | --------- | -------------------------------------------------------------------------------------------- |
