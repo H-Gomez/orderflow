@@ -376,6 +376,94 @@
         "summary": "The authenticated caller's own fills, one row per side the caller was on",
         "tags": ["Trades"]
       }
+    },
+    "/candles": {
+      "get": {
+        "description": "Market data, with no account data. Returns the candles whose openTime is in [from, to), oldest first, with OHLCV values as stored. The window may span at most 1000 interval periods, a partial period counting as one, so at most 1000 candles come back; a longer window is a 400 at query.to. There is no pagination.",
+        "operationId": "CandlesController_candles",
+        "parameters": [
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Exclusive, with an offset, later than from. At most millisecond precision."
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Inclusive, with an offset. At most millisecond precision, from year 1."
+          },
+          {
+            "name": "interval",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["1m", "1h", "1d"] }
+          },
+          {
+            "name": "instrument",
+            "required": true,
+            "in": "query",
+            "schema": { "type": "string", "pattern": "^[A-Z]{3,4}-[A-Z]{3,4}$" },
+            "description": "An instrument symbol, such as BTC-USD. One with no instrument is a 400."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CandlesResponse" } }
+            }
+          },
+          "400": {
+            "description": "The request failed validation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "403": {
+            "description": "The token is valid, but its subject has no account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "429": {
+            "description": "Over the rate limit. See the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the limit resets.",
+                "schema": { "type": "integer" }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "500": {
+            "description": "Something went wrong. The body carries no detail.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "503": {
+            "description": "A dependency is unavailable.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "One instrument's stored candles at one interval, in a time window",
+        "tags": ["Candles"]
+      }
     }
   },
   "info": {
@@ -389,6 +477,36 @@
   "components": {
     "securitySchemes": { "bearer": { "scheme": "bearer", "bearerFormat": "JWT", "type": "http" } },
     "schemas": {
+      "CandlesResponse": {
+        "type": "object",
+        "properties": {
+          "instrument": { "type": "string" },
+          "interval": { "type": "string", "enum": ["1m", "1h", "1d"] },
+          "candles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "openTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                },
+                "open": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "high": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "low": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "close": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "volume": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" }
+              },
+              "required": ["openTime", "open", "high", "low", "close", "volume"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["instrument", "interval", "candles"],
+        "additionalProperties": false,
+        "description": "One window of an instrument's stored candles at one interval, oldest first, at most 1,000. OHLCV values are Money strings, as stored."
+      },
       "ErrorResponse": {
         "type": "object",
         "properties": {
