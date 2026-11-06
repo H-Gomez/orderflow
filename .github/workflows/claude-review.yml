@@ -63,13 +63,13 @@ jobs:
           prompt: |
             Review this pull request. Your one required output is a summary written with the update_claude_comment tool. Inline review comments are optional, for detail on a specific line only, and never a substitute for the summary.
 
-            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks. If you have no findings, write one line in the folded notes that starts "Files read:" and continues on the same line with the files you read, then say what you checked in each.
+            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks. Always end the folded notes with one line that starts "Files read:" and continues on the same line with every changed file you read, whether or not you have findings, then say what you checked in each.
 
             Check, in this order:
 
             1. CLAUDE.md invariants, and the domain rules in docs/. The append-only ledger, balances computed rather than stored, money never as a JS number or a Prisma Float or a Postgres real or double precision, strict TypeScript with no @ts-ignore and no weakening of tsconfig.base.json, no default exports outside *.config.* files, Vitest only, no committed secrets or .env files, no destructive operations.
             2. Idempotency. Any new consumer must be idempotent on event ID, and the engine must publish only through the outbox.
-            3. Scope. Find the story issue the pull request body links with "Closes #<n>", read it with gh issue view, and check that every changed file matches an entry in that story's Touchable files and that nothing under its Out of scope section was touched.
+            3. Scope. Start with `gh pr diff ${{ github.event.pull_request.number }} --name-only`. That list, not the pull request body, is the set of changed files. Read every changed file in full, tests included, except the generated files services/api/openapi.json and pnpm-lock.yaml. Find the story issue the pull request body links with "Closes #<n>", read it with gh issue view, and check that every changed file matches an entry in that story's Touchable files and that nothing under its Out of scope section was touched.
             4. Missed edge cases, and behaviour in the Contract that no test covers.
 
             Write one summary with the update_claude_comment tool, in the format in docs/conventions/agent-comments.md:
@@ -82,8 +82,9 @@ jobs:
             Never approve this pull request and never request changes as a formal review verdict. Comments only. Do not edit any file.
 
       # A required check that can pass with no output is not a control. The
-      # fresh comment must carry the status line, this run's head commit, and
-      # evidence of reading: a path:line finding or a "Files read:" line.
+      # fresh comment must carry the status line, this run's head commit,
+      # evidence of reading (a path:line finding or a "Files read:" line), and
+      # the name of every changed file except the generated ones.
       - name: Fail if the review posted no real summary
         env:
           GH_TOKEN: ${{ github.token }}
@@ -92,6 +93,8 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename' \
+            | grep -vxF -e 'services/api/openapi.json' -e 'pnpm-lock.yaml' || true)"
           bodies="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
             --jq '.[] | select(.user.login == "github-actions[bot]" and .updated_at >= env.STARTED) | .body | @json')"
           found=0
@@ -100,11 +103,16 @@ jobs:
             text="$(jq -r . <<<"$encoded")"
             if grep -qE '^\*\*(ACTION NEEDED|FYI|BLOCKED|DONE)\*\*[[:space:]]*$' <<<"$text" \
               && grep -qF "Reviewed at ${HEAD:0:7}" <<<"$text" \
-              && grep -qE '`[^`[:space:]]+\.[[:alnum:]]+:[0-9]+`|^Files read: *[^[:space:]]' <<<"$text"; then
-              found=1
+              && grep -qE '^Files read: *[^[:space:]]' <<<"$text"; then
+              missing=0
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
+                grep -qF "$f" <<<"$text" || { echo "::error::Review summary does not name ${f}"; missing=1; }
+              done <<<"$changed"
+              [ "$missing" -eq 0 ] && found=1
             fi
           done <<<"$bodies"
           if [ "$found" -ne 1 ]; then
-            echo "::error::No fresh review summary for ${HEAD:0:7} with a status line and path:line findings or a Files read line."
+            echo "::error::No fresh review summary for ${HEAD:0:7} with a status line, a Files read line and every changed file named."
             exit 1
           fi

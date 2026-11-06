@@ -58,7 +58,7 @@ A PR's labels live on its issue number, so the label calls above work for both.
 4. **Create or confirm the branch.**
    - If a branch matching `story-<id>-*` already exists locally or on `origin`, switch to it and say which one you're using.
    - Otherwise: `git switch --no-track -c <branch> origin/<base>` (that flag order; `-c --no-track` is rejected). Without `--no-track` the branch tracks the base branch, and `finish`'s pushed-state check then compares against the wrong ref.
-5. **Empty commit.** Only if `git rev-list --count origin/<base>..HEAD` is `0`: `git commit --allow-empty -F <file>`. The message is `chore: start STORY-<id>` plus any commit trailer this session requires.
+5. **Empty commit.** Only if `git rev-list --count origin/<base>..HEAD` is `0`: `git commit --allow-empty -F <file>`. The message is `chore: start <id>` plus any commit trailer this session requires.
 6. **Push:** `git push -u origin <branch>`.
 7. **Draft PR.** If `gh pr view <branch>` finds a PR, reuse it. Otherwise:
    1. Write the body to a temp file:
@@ -66,7 +66,7 @@ A PR's labels live on its issue number, so the label calls above work for both.
       - Then `## Verification`, holding the issue's Verification section. Each bullet becomes `- [ ] <text>`, with wrapped continuation lines joined into one line. Non-bullet lines, such as "Run by the agent…", stay as plain text.
       - Then an empty `## Evidence` heading.
       - Then any PR footer this session requires.
-   2. Run `gh pr create --draft --base <base> --head <branch> --title "<type>: <summary> (STORY-<id>)" --body-file <file>`. `<type>` is the Conventional Commit type that fits the story (`feat`, `docs`, `chore`, ...).
+   2. Run `gh pr create --draft --base <base> --head <branch> --title "<type>: <summary> (<id>)" --body-file <file>`. `<type>` is the Conventional Commit type that fits the story (`feat`, `docs`, `chore`, ...).
 8. **Comment on the issue** via `gh issue comment <issue> --body-file <file>`, in the comment format with status `FYI`:
 
    ```markdown

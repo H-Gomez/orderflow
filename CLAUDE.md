@@ -62,7 +62,7 @@ Needs Node 24.21.0 ([.nvmrc](.nvmrc)) and pnpm 12.4.2 on `PATH` (`corepack enabl
 - Story identity is the issue number. Refer to work as `#NN`, not `STORY-NNN`. Branch `story-<issue>-<slug>`.
 - A story is a GitHub issue labelled `story`, with Context, Contract, Invariants, Out of scope, Verification
   and Touchable files. The `agent-ready` label means the spec is complete. It does not start work; the human does.
-- The PR body starts with `Closes issue #<issue>`.
+- The PR body starts with `Closes #<issue>`.
 - `/ship start` and `/ship finish` are typed by the human, never invoked by the agent. Outside those two skills, never assign an issue, create a branch, open a PR, or change labels. If a story is not claimed and no one has run /ship start, stop and say so. ([.claude/skills/ship/SKILL.md](.claude/skills/ship/SKILL.md)).
 - Agents open PRs. They never merge, approve, push to `main` or force-push.
 - Agent tokens lack the `read:org` scope, so use `gh api` REST or GraphQL for labels, PR bodies and ready state rather than `gh pr ready` or `gh issue edit --add-label`.
