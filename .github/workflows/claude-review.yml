@@ -63,7 +63,7 @@ jobs:
           prompt: |
             Review this pull request. Your one required output is a summary written with the update_claude_comment tool. Inline review comments are optional, for detail on a specific line only, and never a substitute for the summary.
 
-            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks.. If you have no findings, write one line in the folded notes that starts "Files read:" and continues on the same line with the files you read, then say what you checked in each.
+            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks. If you have no findings, write one line in the folded notes that starts "Files read:" and continues on the same line with the files you read, then say what you checked in each.
 
             Check, in this order:
 

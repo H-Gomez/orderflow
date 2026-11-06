@@ -57,7 +57,7 @@ summary.
 ```
 
 A review summary with no findings still shows what was checked: one line in the folded notes that
-starts `Files read:` and lists the files on the same line. The `invariants and scope` check in
+starts `Files read:` and lists the files on the same line. The `Fail if the review posted no real summary` check in
 `claude-review.yml` fails a summary that has neither a `path:line` finding nor that line, or whose
 `Reviewed at` SHA is not the PR head.
 
