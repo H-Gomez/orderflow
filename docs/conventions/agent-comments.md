@@ -87,7 +87,7 @@ Reviewed at 1578c8f
 
 Findings: 1 high, 0 medium, 1 low
 
-- Severity = **high**: [`.claude/skills/ship/SKILL.md:61`](https://github.com/H-Gomez/orderflow/blob/<head sha>/.claude/skills/ship/SKILL.md#L61) - the template writes a bare `<id>`, so PR titles no longer link their issue.
+- Severity = **high**: `.claude/skills/ship/SKILL.md:61` - the template writes a bare `<id>`, so PR titles no longer link their issue.
 - Severity = **low**: Scope - #86 has no Touchable files section, so scope was checked against its Change section.
 
 <details><summary>Full notes</summary>
@@ -95,6 +95,7 @@ Findings: 1 high, 0 medium, 1 low
 The detail behind each finding, and what was checked in each file.
 
 Not checked: did not run the workflow's bash step.
+
 Files read: `.claude/skills/ship/SKILL.md`, `.github/workflows/claude-review.yml`, `CLAUDE.md`, `services/api/README.md`
 
 </details>
