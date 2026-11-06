@@ -63,7 +63,7 @@ jobs:
           prompt: |
             Review this pull request. Your one required output is a summary written with the update_claude_comment tool. Inline review comments are optional, for detail on a specific line only, and never a substitute for the summary.
 
-            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks where one line applies, or a short subject where none does. Always end the folded notes with one line that starts "Files read:" and continues on the same line with every changed file you read, whether or not you have findings, then say what you checked in each.
+            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks where one line applies, or a short subject where none does. Always end the folded notes with one line that starts "Files read:" and continues on the same line with every changed file you read, whether or not you have findings, then say what you checked in each file in the folded notes, above that line..
 
             Check, in this order:
 
@@ -77,6 +77,7 @@ jobs:
             - line 2: what the human must do
             - line 3: Reviewed at <the first 7 characters of ${{ github.event.pull_request.head.sha }}>
             - then at most 5 bullets, everything else folded in <details>.
+            Put one blank line after each of lines 1 to 4, so GitHub renders them as separate paragraphs.
             Each finding is one bullet, ordered high to low, in exactly this form: Severity = <high|medium|low> in bold: <`path:line` in backticks, or a short subject> - <the problem and why it matters>. For example: Severity = high: `services/api/src/trades/trades.controller.ts:202` - take omits the extra fill after a BUY cursor, so the last page can end early. Put the detail in an inline comment on that line.
 
             Never approve this pull request and never request changes as a formal review verdict. Comments only. Do not edit any file.
