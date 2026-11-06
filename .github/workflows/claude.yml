@@ -28,7 +28,8 @@ jobs:
     # No label trigger: agent-ready is a state, not a command. Starting a
     # story from CI is not wired yet; see the backlog issue.
     # Every comment claude[bot] posts fires this event too; the actor check
-    # skips it, and the skipped run in the Actions list is expected.
+    # skips it, and the skipped run in the Actions list is expected. The PR
+    # review posts as github-actions[bot], which starts no run at all.
     if: >-
       github.actor == 'H-Gomez' &&
       contains(github.event.comment.body, '@claude')
