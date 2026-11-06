@@ -83,6 +83,10 @@ describe("toTradeRows and afterCursor", () => {
       "BUY",
       "SELL",
     ]);
+    const later = new Date("2026-11-05T11:00:00.000Z");
+    expect(
+      sidesOf(afterCursor(rows, { filledAt: later, fillId: "fill", side: OrderSide.BUY })),
+    ).toEqual(["BUY", "SELL"]);
     expect(sidesOf(afterCursor(rows, { ...key, side: OrderSide.SELL }))).toEqual(["BUY", "SELL"]);
     expect(sidesOf(afterCursor(rows, undefined))).toEqual(["BUY", "SELL"]);
   });

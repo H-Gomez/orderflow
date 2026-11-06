@@ -99,15 +99,24 @@ export const toTradeRows = (fill: FillRow, accountId: string): TradeItem[] => {
 
 /**
  * After a `BUY` cursor the database returns the cursor's own fill again, for its `SELL` row. Its
- * `BUY` row is the one row returned that is not after the cursor, so it is dropped by equality.
- * Ids are never ordered here, because JavaScript and Postgres collation can disagree on them.
+ * `BUY` row is the one row returned that is not after the cursor, so it is dropped by equality on
+ * the whole key. Ids are never ordered here, because JavaScript and Postgres collation can disagree
+ * on them. The time is compared too: a hand-written cursor with a real fill id and another time
+ * matches that fill through `createdAt < filledAt`, and its BUY row is then after the cursor.
  */
 export const afterCursor = (
   rows: readonly TradeItem[],
   cursor: TradesKey | undefined,
 ): TradeItem[] =>
   cursor?.side === OrderSide.BUY
-    ? rows.filter((row) => !(row.fillId === cursor.fillId && row.side === OrderSide.BUY))
+    ? rows.filter(
+        (row) =>
+          !(
+            row.fillId === cursor.fillId &&
+            row.side === OrderSide.BUY &&
+            row.filledAt.getTime() === cursor.filledAt.getTime()
+          ),
+      )
     : [...rows];
 
 @Controller("trades")
