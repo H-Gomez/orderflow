@@ -63,7 +63,7 @@ jobs:
           prompt: |
             Review this pull request. Your one required output is a summary written with the update_claude_comment tool. Inline review comments are optional, for detail on a specific line only, and never a substitute for the summary.
 
-            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks where one line applies, or a short subject where none does. Always end the folded notes with one line that starts "Files read:" and continues on the same line with every changed file you read, whether or not you have findings, then say what you checked in each file in the folded notes, above that line..
+            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks where one line applies, or a short subject where none does. Always end the folded notes with one line that starts "Files read:" and continues on the same line with every changed file you read, whether or not you have findings, then say what you checked in each file in the folded notes, above that line.
 
             Check, in this order:
 
@@ -74,11 +74,12 @@ jobs:
 
             Write one summary with the update_claude_comment tool, in the format in docs/conventions/agent-comments.md:
             - line 1: a bold status word (ACTION NEEDED if anything blocks, otherwise FYI)
-            - line 2: what the human must do
+            - line 2: what the human must do, in at most 30 words
             - line 3: Reviewed at <the first 7 characters of ${{ github.event.pull_request.head.sha }}>
-            - then at most 5 bullets, everything else folded in <details>.
+            - line 4: Findings: N high, N medium, N low (or "No findings.")
+            - then at most 5 finding bullets, everything else folded in <details>.
             Put one blank line after each of lines 1 to 4, so GitHub renders them as separate paragraphs.
-            Each finding is one bullet, ordered high to low, in exactly this form: Severity = <high|medium|low> in bold: <`path:line` in backticks, or a short subject> - <the problem and why it matters>. For example: Severity = high: `services/api/src/trades/trades.controller.ts:202` - take omits the extra fill after a BUY cursor, so the last page can end early. Put the detail in an inline comment on that line.
+            Each finding is one bullet, ordered high to low, in exactly this form, with only the severity word in bold: Severity = **<high|medium|low>**: <`path:line` in backticks, or a short subject such as Scope> - <the problem and why it matters, in at most 30 words>. For example: Severity = **high**: `services/api/src/trades/trades.controller.ts:202` - take omits the extra fill after a BUY cursor, so the last page can end early. Put the detail in an inline comment on that line.
 
             Never approve this pull request and never request changes as a formal review verdict. Comments only. Do not edit any file.
 
@@ -103,14 +104,18 @@ jobs:
             [ -n "$encoded" ] || continue
             text="$(jq -r . <<<"$encoded")"
             if grep -qE '^\*\*(ACTION NEEDED|FYI|BLOCKED|DONE)\*\*[[:space:]]*$' <<<"$text" \
-              && grep -qF "Reviewed at ${HEAD:0:7}" <<<"$text" \
-              && grep -qE '^Files read: *[^[:space:]]' <<<"$text"; then
-              missing=0
-              while IFS= read -r f; do
-                [ -n "$f" ] || continue
-                grep -qF "$f" <<<"$text" || { echo "::error::Review summary does not name ${f}"; missing=1; }
-              done <<<"$changed"
-              [ "$missing" -eq 0 ] && found=1
+              && grep -qF "Reviewed at ${HEAD:0:7}" <<<"$text"; then
+              files_line="$(grep -E '^(- )?Files read: *[^[:space:]]' <<<"$text" | tail -n 1 || true)"
+              if [ -n "$files_line" ]; then
+                listed="$(sed -E 's/^(- )?Files read:[[:space:]]*//' <<<"$files_line" \
+                  | tr ',' '\n' | tr -d '`\r' | sed -E 's/^[[:space:]]+//; s/[.[:space:]]+$//')"
+                missing=0
+                while IFS= read -r f; do
+                  [ -n "$f" ] || continue
+                  grep -qxF -- "$f" <<<"$listed" || { echo "::error::Files read line does not list ${f}"; missing=1; }
+                done <<<"$changed"
+                [ "$missing" -eq 0 ] && found=1
+              fi
             fi
           done <<<"$bodies"
           if [ "$found" -ne 1 ]; then
