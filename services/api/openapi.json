@@ -505,7 +505,7 @@
         },
         "required": ["instrument", "interval", "candles"],
         "additionalProperties": false,
-        "description": "One window of an instrument's stored candles at one interval, oldest first, at most 1,000. OHLCV values are Money strings, as stored."
+        "description": "One window of an instrument's stored candles at one interval, oldest first, at most 1000. OHLCV values are Money strings, as stored."
       },
       "ErrorResponse": {
         "type": "object",

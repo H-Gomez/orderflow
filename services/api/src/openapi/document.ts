@@ -5,7 +5,7 @@ import type { OpenAPIObject } from "@nestjs/swagger";
 import { z } from "zod";
 
 import { AppModule } from "../app.module.js";
-import { candlesResponseSchema } from "../candles/candles.controller.js";
+import { MAX_CANDLES, candlesResponseSchema } from "../candles/candles.controller.js";
 import type { AppConfig } from "../config/config.js";
 import { errorResponseSchema } from "../errors/error-response.js";
 import { livenessResponseSchema, readinessResponseSchema } from "../health/health.controller.js";
@@ -32,7 +32,7 @@ const componentSchema = (schema: z.ZodType, description: string): ComponentSchem
 const COMPONENTS = {
   CandlesResponse: componentSchema(
     candlesResponseSchema,
-    "One window of an instrument's stored candles at one interval, oldest first, at most 1,000. OHLCV values are Money strings, as stored.",
+    `One window of an instrument's stored candles at one interval, oldest first, at most ${MAX_CANDLES.toString()}. OHLCV values are Money strings, as stored.`,
   ),
   ErrorResponse: componentSchema(errorResponseSchema, "The shape of every failure."),
   LedgerPage: componentSchema(
