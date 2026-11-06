@@ -281,6 +281,101 @@
         "summary": "The authenticated caller's own ledger entries",
         "tags": ["Ledger"]
       }
+    },
+    "/trades": {
+      "get": {
+        "description": "Keyset-paginated, sorted by (filledAt desc, fillId desc, side asc), at most 200 rows a page. filledAt is the trade time, and the time filter applies to it. A fill whose two orders are both the caller's gives a BUY row and a SELL row. price and quantity are as stored. fillId leads to the TRADE entries on GET /ledger, which carry the exact amounts.",
+        "operationId": "TradesController_trades",
+        "parameters": [
+          {
+            "name": "instrument",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "pattern": "^[A-Z]{3,4}-[A-Z]{3,4}$" },
+            "description": "An instrument symbol, such as BTC-USD. One with no instrument is a 400."
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Exclusive, with an offset. At most millisecond precision, from year 1."
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" },
+            "description": "Inclusive, with an offset. At most millisecond precision, from year 1."
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "The nextCursor of a previous page."
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 200, "default": 50 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TradesPage" } }
+            }
+          },
+          "400": {
+            "description": "The request failed validation.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "403": {
+            "description": "The token is valid, but its subject has no account.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "429": {
+            "description": "Over the rate limit. See the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the limit resets.",
+                "schema": { "type": "integer" }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "500": {
+            "description": "Something went wrong. The body carries no detail.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "503": {
+            "description": "A dependency is unavailable.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "The authenticated caller's own fills, one row per side the caller was on",
+        "tags": ["Trades"]
+      }
     }
   },
   "info": {
@@ -429,6 +524,35 @@
         "required": ["status"],
         "additionalProperties": false,
         "description": "The database answered."
+      },
+      "TradesPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fillId": { "type": "string" },
+                "instrument": { "type": "string" },
+                "side": { "type": "string", "enum": ["BUY", "SELL"] },
+                "price": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "quantity": { "type": "string", "pattern": "^-?\\d{1,20}(\\.\\d{1,18})?$" },
+                "filledAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                }
+              },
+              "required": ["fillId", "instrument", "side", "price", "quantity", "filledAt"],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": { "nullable": true, "type": "string" }
+        },
+        "required": ["items", "nextCursor"],
+        "additionalProperties": false,
+        "description": "One page of the caller's fills, one row per side the caller was on, newest first. nextCursor is null on the last page."
       }
     }
   }
