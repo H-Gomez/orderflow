@@ -21,9 +21,11 @@ import { ZodPipe } from "../validation/zod.pipe.js";
 
 /**
  * Newest first. Every entry of a transaction shares its timestamp, so `id` breaks the ties. The id
- * accepts any value the TEXT column can hold, so every stored row yields a cursor this route takes
- * back: the uuid default is applied by the Prisma client, not by the database. Only a NUL is
- * refused, because Postgres rejects it in text, which would be a 500.
+ * accepts any value the TEXT column can hold, so every row with a `createdAt` from year 1 to 9999
+ * yields a cursor this route takes back: the uuid default is applied by the Prisma client, not by
+ * the database. Only a NUL is refused, because Postgres rejects it in text, which would be a 500.
+ * A `createdAt` past year 9999 is not covered: `toISOString()` writes it as `+010000-...`, which
+ * `dateTimeSchema` refuses, so its cursor is a 400. Real data does not reach it.
  */
 const ledgerKeySchema = z.strictObject({
   createdAt: dateTimeSchema,
