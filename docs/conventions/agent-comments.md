@@ -20,8 +20,10 @@ human has to do. Everything else is kept for the audit trail, folded away. Nothi
    - `**BLOCKED**` — the agent cannot continue until something outside its control changes.
    - `**DONE**` — the work is finished.
 2. **Line 2:** what the human must do, in one sentence. "Nothing." is valid.
-3. **Up to 5 bullets**, each under 20 words. Decisions and risks only. No narration of steps taken.
-4. **Everything else** inside `<details><summary>Full notes</summary> ... </details>`: the steps,
+3. **Line 3, PR review summaries only:** `Reviewed at <sha>`, the first 7 characters of the head
+   commit reviewed. It ties the review to one version of the PR. Other comments have no line 3.
+4. **Up to 5 bullets**, each under 20 words. Decisions and risks only. No narration of steps taken.
+5. **Everything else** inside `<details><summary>Full notes</summary> ... </details>`: the steps,
    commands, output, reasoning. Leave a blank line after `<summary>` and before `</details>` so GitHub
    renders the Markdown inside.
 
@@ -52,6 +54,25 @@ summary.
 ```markdown
 - `packages/ledger/src/post.ts:42` — high — balance stored in a column; CLAUDE.md says compute it.
 - `packages/ledger/src/post.ts:88` — low — magic number for the fee rate.
+```
+
+A review summary with no findings still shows what was checked: one line in the folded notes that
+starts `Files read:` and lists the files on the same line. The `invariants and scope` check in
+`claude-review.yml` fails a summary that has neither a `path:line` finding nor that line, or whose
+`Reviewed at` SHA is not the PR head.
+
+```markdown
+**FYI**
+Nothing.
+Reviewed at 2d305e2
+
+- No findings; the diff touches only the review workflow.
+
+<details><summary>Full notes</summary>
+
+Files read: .github/workflows/claude-review.yml, CLAUDE.md, docs/conventions/agent-comments.md
+
+</details>
 ```
 
 ## Checking a comment
