@@ -73,6 +73,27 @@ A global interceptor turns every `ExactDecimal` and `Prisma.Decimal` in a respon
 
 In OpenAPI, reference the `Money` component for any amount.
 
+## Pagination
+
+Every list endpoint uses one scheme, from [src/pagination/](src/pagination/pagination.ts). It is keyset, never offset, so a row written after a page was read never makes the next page repeat or skip a row. A walk is still not a snapshot: `createdAt` is set when a transaction starts, so a row whose transaction started before a page was read and committed after it can be missed. M0 has no concurrent API writer, and M2's consumers read the outbox, not these endpoints.
+
+| Parameter | Meaning                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------- |
+| `limit`   | An integer from 1 to 200. Default 50.                                                        |
+| `cursor`  | Opaque: the `nextCursor` of a previous page.                                                 |
+| `from`    | Inclusive. An ISO 8601 date-time with an offset, at most millisecond precision, from year 1. |
+| `to`      | Exclusive, in the same format. `from` must be earlier, or it is a 400 at `query.to`.         |
+
+Send a `+` in an offset as `%2B`. A bare `+` in a query string decodes to a space, which is a 400.
+
+The response is `{ "items": [...], "nextCursor": "..." }`, and `nextCursor` is `null` on the last page.
+
+Rows are ordered newest first by a sort key each endpoint defines and its OpenAPI description states. Every key ends in the row's `id`, because ties on `createdAt` are certain: a transaction's entries all share one timestamp. The next page is the rows strictly after the last row's key.
+
+A cursor is base64url of the JSON sort key, validated on the way in. A cursor that fails to decode or validate is a 400 `VALIDATION_FAILED` at `query.cursor`. It carries no account id and grants nothing: scoping always comes from the principal, so another account's cursor returns only the caller's rows.
+
+OpenAPI 3.0 has no generics, so each list endpoint has its own named page component, such as `LedgerPage`.
+
 ## OpenAPI
 
 [openapi.json](openapi.json) is committed so the contract is reviewable in a diff. After changing a route or a schema, run `pnpm openapi` from the root. A test fails when the file differs from what the code generates.

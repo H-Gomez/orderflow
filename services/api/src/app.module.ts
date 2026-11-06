@@ -10,6 +10,7 @@ import type { AppConfig } from "./config/config.js";
 import { DatabaseModule } from "./database/database.module.js";
 import { AllExceptionsFilter } from "./errors/all-exceptions.filter.js";
 import { HealthController } from "./health/health.controller.js";
+import { LedgerController } from "./ledger/ledger.controller.js";
 import { MeController } from "./me/me.controller.js";
 import { MoneyInterceptor } from "./money/money.interceptor.js";
 import { PortfolioController } from "./portfolio/portfolio.controller.js";
@@ -22,7 +23,7 @@ export class AppModule {
     return {
       module: AppModule,
       imports: [ConfigModule.forRoot(config), DatabaseModule, AuthModule, RateLimitModule],
-      controllers: [HealthController, MeController, PortfolioController],
+      controllers: [HealthController, MeController, PortfolioController, LedgerController],
       providers: [
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
         { provide: APP_INTERCEPTOR, useClass: MoneyInterceptor },

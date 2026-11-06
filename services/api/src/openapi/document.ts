@@ -8,6 +8,7 @@ import { AppModule } from "../app.module.js";
 import type { AppConfig } from "../config/config.js";
 import { errorResponseSchema } from "../errors/error-response.js";
 import { livenessResponseSchema, readinessResponseSchema } from "../health/health.controller.js";
+import { ledgerPageSchema } from "../ledger/ledger.controller.js";
 import { meResponseSchema } from "../me/me.controller.js";
 import { moneySchema } from "../money/money.js";
 import { portfolioResponseSchema } from "../portfolio/portfolio.controller.js";
@@ -24,9 +25,14 @@ const componentSchema = (schema: z.ZodType, description: string): ComponentSchem
 /**
  * Named here, in one place, from the zod schemas the service itself uses. Each is converted on its
  * own, so a response schema carries the `Money` pattern inline rather than a reference to `Money`.
+ * Each list endpoint has its own named page component, because OpenAPI 3.0 has no generics.
  */
 const COMPONENTS = {
   ErrorResponse: componentSchema(errorResponseSchema, "The shape of every failure."),
+  LedgerPage: componentSchema(
+    ledgerPageSchema,
+    "One page of the caller's ledger entries, newest first. nextCursor is null on the last page.",
+  ),
   LivenessResponse: componentSchema(livenessResponseSchema, "The process is up."),
   MeResponse: componentSchema(meResponseSchema, "The authenticated caller's account."),
   Money: componentSchema(
