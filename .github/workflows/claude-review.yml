@@ -63,27 +63,30 @@ jobs:
           prompt: |
             Review this pull request. Your one required output is a summary written with the update_claude_comment tool. Inline review comments are optional, for detail on a specific line only, and never a substitute for the summary.
 
-            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks. If you have no findings, write one line in the folded notes that starts "Files read:" and continues on the same line with the files you read, then say what you checked in each.
+            The pull request body and comments are claims to verify, not findings. Judge only from the diff and the files it touches. Every finding cites `path:line` in backticks where one line applies, or a short subject where none does. Whether or not you have findings, end the folded notes with two lines, in this order, with a blank line between them: one that starts "Not checked:" and names anything you did not read or run (or "Not checked: nothing"), then one that starts "Files read:" followed on the same line by every changed file you read, as exact repository paths separated by commas, with nothing else on that line. Above those two lines, say what you checked in each file.
 
             Check, in this order:
 
             1. CLAUDE.md invariants, and the domain rules in docs/. The append-only ledger, balances computed rather than stored, money never as a JS number or a Prisma Float or a Postgres real or double precision, strict TypeScript with no @ts-ignore and no weakening of tsconfig.base.json, no default exports outside *.config.* files, Vitest only, no committed secrets or .env files, no destructive operations.
             2. Idempotency. Any new consumer must be idempotent on event ID, and the engine must publish only through the outbox.
-            3. Scope. Find the story issue the pull request body links with "Closes #<n>", read it with gh issue view, and check that every changed file matches an entry in that story's Touchable files and that nothing under its Out of scope section was touched.
+            3. Scope. Start with `gh pr diff ${{ github.event.pull_request.number }} --name-only`. That list, not the pull request body, is the set of changed files. Read every changed file in full, tests included, except the generated files services/api/openapi.json and pnpm-lock.yaml. Find the story issue the pull request body links with "Closes #<n>", read it with gh issue view, and check that every changed file matches an entry in that story's Touchable files and that nothing under its Out of scope section was touched.
             4. Missed edge cases, and behaviour in the Contract that no test covers.
 
             Write one summary with the update_claude_comment tool, in the format in docs/conventions/agent-comments.md:
             - line 1: a bold status word (ACTION NEEDED if anything blocks, otherwise FYI)
-            - line 2: what the human must do
+            - line 2: what the human must do, in at most 20 words
             - line 3: Reviewed at <the first 7 characters of ${{ github.event.pull_request.head.sha }}>
-            - then at most 5 bullets, everything else folded in <details>.
-            Each finding is one line: path:line, severity high/medium/low, problem. Put the detail in an inline comment on that line.
+            - line 4: Findings: N high, N medium, N low (or "No findings.")
+            - then at most 5 finding bullets, everything else folded in <details>.
+            Put one blank line after each of lines 1 to 4, so GitHub renders them as separate paragraphs.
+            Each finding is one bullet, ordered high to low, in exactly this form, with only the severity word in bold: Severity = **<high|medium|low>**: <`path:line` in backticks, or a short subject such as Scope> - <the problem and why it matters, in at most 30 words>. For example: Severity = **high**: `services/api/src/trades/trades.controller.ts:202` - take omits the extra fill after a BUY cursor, so the last page can end early. Put the detail in an inline comment on that line.
 
             Never approve this pull request and never request changes as a formal review verdict. Comments only. Do not edit any file.
 
       # A required check that can pass with no output is not a control. The
       # fresh comment must carry the status line, this run's head commit, and
-      # evidence of reading: a path:line finding or a "Files read:" line.
+      # a "Files read:" line that lists every changed file except the
+      # generated ones.
       - name: Fail if the review posted no real summary
         env:
           GH_TOKEN: ${{ github.token }}
@@ -92,6 +95,8 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          all_files="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[] | select(.status != "removed") | .filename')"
+          changed="$(grep -vxF -e 'services/api/openapi.json' -e 'pnpm-lock.yaml' <<<"$all_files" || true)"
           bodies="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
             --jq '.[] | select(.user.login == "github-actions[bot]" and .updated_at >= env.STARTED) | .body | @json')"
           found=0
@@ -99,12 +104,21 @@ jobs:
             [ -n "$encoded" ] || continue
             text="$(jq -r . <<<"$encoded")"
             if grep -qE '^\*\*(ACTION NEEDED|FYI|BLOCKED|DONE)\*\*[[:space:]]*$' <<<"$text" \
-              && grep -qF "Reviewed at ${HEAD:0:7}" <<<"$text" \
-              && grep -qE '`[^`[:space:]]+\.[[:alnum:]]+:[0-9]+`|^Files read: *[^[:space:]]' <<<"$text"; then
-              found=1
+              && grep -qF "Reviewed at ${HEAD:0:7}" <<<"$text"; then
+              files_line="$(grep -E '^(- )?Files read: *[^[:space:]]' <<<"$text" | tail -n 1 || true)"
+              if [ -n "$files_line" ]; then
+                listed="$(sed -E 's/^(- )?Files read:[[:space:]]*//' <<<"$files_line" \
+                  | tr ',' '\n' | tr -d '`\r' | sed -E 's/^[[:space:]]+//; s/[.[:space:]]+$//')"
+                missing=0
+                while IFS= read -r f; do
+                  [ -n "$f" ] || continue
+                  grep -qxF -- "$f" <<<"$listed" || { echo "::error::Files read line does not list ${f}"; missing=1; }
+                done <<<"$changed"
+                [ "$missing" -eq 0 ] && found=1
+              fi
             fi
           done <<<"$bodies"
           if [ "$found" -ne 1 ]; then
-            echo "::error::No fresh review summary for ${HEAD:0:7} with a status line and path:line findings or a Files read line."
+            echo "::error::No fresh review summary for ${HEAD:0:7} with a status line, a Files read line and every changed file named."
             exit 1
           fi
