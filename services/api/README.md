@@ -88,7 +88,7 @@ Send a `+` in an offset as `%2B`. A bare `+` in a query string decodes to a spac
 
 The response is `{ "items": [...], "nextCursor": "..." }`, and `nextCursor` is `null` on the last page.
 
-Rows are ordered newest first by a sort key each endpoint defines and its OpenAPI description states. Every key ends in the row's `id`, because ties on `createdAt` are certain: a transaction's entries all share one timestamp. The next page is the rows strictly after the last row's key.
+Rows are ordered newest first by a sort key each endpoint defines and its OpenAPI description states. Every key ends in fields that make it unique, because ties on time are certain: a transaction's entries all share one timestamp, and a fill whose two orders are both the caller's gives two rows. `/ledger`'s key is `(createdAt, id)`; `/trades`'s is `(filledAt, fillId, side)`. The next page is the rows strictly after the last row's key.
 
 A cursor is base64url of the JSON sort key, validated on the way in. A cursor that fails to decode or validate is a 400 `VALIDATION_FAILED` at `query.cursor`. It carries no account id and grants nothing: scoping always comes from the principal, so another account's cursor returns only the caller's rows.
 
