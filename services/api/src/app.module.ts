@@ -5,6 +5,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { AccountGuard } from "./auth/account.guard.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard.js";
+import { CandlesController } from "./candles/candles.controller.js";
 import { ConfigModule } from "./config/config.module.js";
 import type { AppConfig } from "./config/config.js";
 import { DatabaseModule } from "./database/database.module.js";
@@ -30,6 +31,7 @@ export class AppModule {
         PortfolioController,
         LedgerController,
         TradesController,
+        CandlesController,
       ],
       providers: [
         { provide: APP_FILTER, useClass: AllExceptionsFilter },

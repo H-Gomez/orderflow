@@ -40,6 +40,7 @@ describe("the committed OpenAPI document", () => {
     const { paths } = await committed();
 
     expect(Object.keys(paths).sort()).toEqual([
+      "/candles",
       "/health",
       "/health/ready",
       "/ledger",
@@ -56,6 +57,7 @@ describe("the committed OpenAPI document", () => {
     expect(paths["/portfolio"]?.get?.security).toEqual([{ bearer: [] }]);
     expect(paths["/ledger"]?.get?.security).toEqual([{ bearer: [] }]);
     expect(paths["/trades"]?.get?.security).toEqual([{ bearer: [] }]);
+    expect(paths["/candles"]?.get?.security).toEqual([{ bearer: [] }]);
     expect(paths["/health"]?.get?.security).toBeUndefined();
     expect(paths["/health/ready"]?.get?.security).toBeUndefined();
   });
