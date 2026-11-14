@@ -90,6 +90,8 @@ The response is `{ "items": [...], "nextCursor": "..." }`, and `nextCursor` is `
 
 Rows are ordered newest first by a sort key each endpoint defines and its OpenAPI description states. Every key ends in fields that make it unique, because ties on time are certain: a transaction's entries all share one timestamp, and a fill whose two orders are both the caller's gives two rows. `/ledger`'s key is `(createdAt, id)`; `/trades`'s is `(filledAt, fillId, side)`. The next page is the rows strictly after the last row's key.
 
+The database does all the ordering, through the where clause and `orderBy`. Code never orders key fields itself with `<`, `>`, `localeCompare` or a sort: JavaScript string order and Postgres collation can disagree on ids, which silently skips or repeats rows. A filter after the fetch, such as `/trades` dropping the cursor's own `BUY` row, matches rows by equality only.
+
 A cursor is base64url of the JSON sort key, validated on the way in. A cursor that fails to decode or validate is a 400 `VALIDATION_FAILED` at `query.cursor`. It carries no account id and grants nothing: scoping always comes from the principal, so another account's cursor returns only the caller's rows.
 
 OpenAPI 3.0 has no generics, so each list endpoint has its own named page component, such as `LedgerPage`.
