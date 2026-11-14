@@ -41,8 +41,15 @@ interface Parameter {
   readonly schema: ParameterSchema;
 }
 
+/** Every operation is walked, not only GET, so a query on a future POST is covered too. */
+const METHODS = ["get", "post", "put", "patch", "delete"] as const;
+type Method = (typeof METHODS)[number];
+
 interface Document {
-  readonly paths: Record<string, { readonly get?: { readonly parameters?: Parameter[] } }>;
+  readonly paths: Record<
+    string,
+    Partial<Record<Method, { readonly parameters?: readonly Parameter[] }>>
+  >;
 }
 
 /** A value each parameter name accepts, for the parameters a case leaves alone. */
@@ -55,11 +62,16 @@ const VALID: Readonly<Record<string, string>> = {
   limit: "50",
 };
 
-/** Cursors the scheme refuses: not base64url, and base64url of JSON that is no sort key. */
-const INVALID_CURSORS = ["!!!", Buffer.from("{}", "utf8").toString("base64url")];
+/**
+ * Refused values for parameters whose documented schema is a bare string, so it names nothing to
+ * refuse. A cursor is refused when it is not base64url, or is base64url of JSON that is no sort key.
+ */
+const INVALID_BY_NAME: Readonly<Record<string, readonly string[]>> = {
+  cursor: ["!!!", Buffer.from("{}", "utf8").toString("base64url")],
+};
 
-/** Values the documented schema refuses, by the schema's own constraints. */
-const invalidValues = (parameter: Parameter): string[] => {
+/** Values the documented schema refuses, by the schema's own constraints, else by name. */
+const invalidValues = (route: string, parameter: Parameter): readonly string[] => {
   const { name, schema } = parameter;
   if (schema.format === "date-time") {
     return [
@@ -86,21 +98,22 @@ const invalidValues = (parameter: Parameter): string[] => {
       "ten",
     ];
   }
-  if (name === "cursor") {
-    return INVALID_CURSORS;
+  const named = INVALID_BY_NAME[name];
+  if (named === undefined) {
+    throw new Error(`Add refused values to INVALID_BY_NAME for ${route} parameter "${name}"`);
   }
-  // An unconstrained string refuses nothing by value; the repeated-key case still covers it.
-  return [];
+  return named;
 };
 
 interface Case {
+  readonly method: Method;
   readonly route: string;
   readonly label: string;
   readonly query: string;
   readonly expectedPath: string;
 }
 
-const casesFor = (route: string, parameters: readonly Parameter[]): Case[] => {
+const casesFor = (method: Method, route: string, parameters: readonly Parameter[]): Case[] => {
   const query = parameters.filter((parameter) => parameter.in === "query");
   if (query.length === 0) {
     return [];
@@ -121,29 +134,37 @@ const casesFor = (route: string, parameters: readonly Parameter[]): Case[] => {
   const cases = query.flatMap((parameter): Case[] => {
     const { name } = parameter;
     const expectedPath = `query.${name}`;
-    const sample = VALID[name] ?? INVALID_CURSORS[0] ?? "x";
+    const sample = VALID[name];
     return [
-      ...invalidValues(parameter).map((value) => ({
+      ...invalidValues(route, parameter).map((value) => ({
+        method,
         route,
         label: `${name}=${JSON.stringify(value)}`,
         query: withValue(name, [[name, value]]),
         expectedPath,
       })),
-      {
-        route,
-        label: `${name} given twice`,
-        query: withValue(name, [
-          [name, sample],
-          [name, sample],
-        ]),
-        expectedPath,
-      },
+      // Twice a valid value, so the repetition alone is what is refused.
+      ...(sample === undefined
+        ? []
+        : [
+            {
+              method,
+              route,
+              label: `${name} given twice`,
+              query: withValue(name, [
+                [name, sample],
+                [name, sample],
+              ]),
+              expectedPath,
+            },
+          ]),
     ];
   });
 
   return [
     ...cases,
     {
+      method,
       route,
       label: "an undocumented parameter",
       query: withValue("", [["undocumentedParameter", "1"]]),
@@ -153,8 +174,16 @@ const casesFor = (route: string, parameters: readonly Parameter[]): Case[] => {
 };
 
 const document = JSON.parse(await readFile(OPENAPI_PATH, "utf8")) as Document;
-const cases = Object.entries(document.paths).flatMap(([route, item]) =>
-  casesFor(route, item.get?.parameters ?? []),
+const operations = Object.entries(document.paths).flatMap(([route, item]) =>
+  METHODS.flatMap((method) => {
+    const operation = item[method];
+    return operation === undefined
+      ? []
+      : [{ method, route, parameters: operation.parameters ?? [] }];
+  }),
+);
+const cases = operations.flatMap(({ method, route, parameters }) =>
+  casesFor(method, route, parameters),
 );
 
 describe("an invalid query parameter on any documented route", () => {
@@ -178,20 +207,20 @@ describe("an invalid query parameter on any documented route", () => {
     await oidc.stop();
   });
 
-  it("has cases for every route that documents a query parameter", () => {
-    expect([...new Set(cases.map(({ route }) => route))].sort()).toEqual(
-      Object.entries(document.paths)
-        .filter(([, item]) =>
-          (item.get?.parameters ?? []).some(({ in: where }) => where === "query"),
-        )
-        .map(([route]) => route)
+  it("has cases for every operation that documents a query parameter", () => {
+    const key = ({ method, route }: { method: Method; route: string }) => `${method} ${route}`;
+
+    expect([...new Set(cases.map(key))].sort()).toEqual(
+      operations
+        .filter(({ parameters }) => parameters.some(({ in: where }) => where === "query"))
+        .map(key)
         .sort(),
     );
   });
 
-  it.each(cases)("$route with $label is a 400 at $expectedPath", async (testCase) => {
+  it.each(cases)("$method $route with $label is a 400 at $expectedPath", async (testCase) => {
     const response = await request(app.getHttpServer())
-      .get(`${testCase.route}?${testCase.query}`)
+      [testCase.method](`${testCase.route}?${testCase.query}`)
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(400);
