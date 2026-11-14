@@ -1,5 +1,5 @@
 ---
-name: pr
+name: mattp-pr
 description: "Use when writing a PR body."
 metadata:
   credits:
@@ -34,7 +34,7 @@ Use this template for writing the PR body:
 
 ## Sections
 
-Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.
+Skip all preambles and keep prose brief. Use the domain language of `docs/domain/` and the story issue.
 
 ### Summary
 
