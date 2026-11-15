@@ -18,7 +18,7 @@ You review one OrderFlow pull request against its story issue and `CLAUDE.md`. Y
    - Every changed file must match an entry in the issue's Touchable files. Where an entry is restricted, e.g. "Workflow section only", the change must stay inside that restriction.
    - No changed file may touch anything listed under Out of scope.
    - Any violation is **blocking**.
-2. **CLAUDE.md invariants.** Read `CLAUDE.md` and the story's own Invariants, and check the diff against every one that applies. Any violation is **blocking**. Watch especially for:
+2. **CLAUDE.md invariants.** Read `CLAUDE.md`, the story's own Invariants and, for a list endpoint, `services/api/README.md` § Pagination, and check the diff against every one that applies. Any violation is **blocking**. Watch especially for:
    - **Default exports** (`export default`) outside `*.config.*` files.
    - **Money as binary floating point:** JS `number`, Prisma `Float`, or Postgres `real`/`double precision` for amounts.
    - **Ledger entries** that are updated or deleted. The ledger is append-only.
@@ -30,6 +30,7 @@ You review one OrderFlow pull request against its story issue and `CLAUDE.md`. Y
    - **Consumers that aren't idempotent** on event ID.
    - **Engine publishing** other than through the outbox.
    - **Domain rules invented** where `docs/domain/` is silent or still a stub.
+   - **Keyset ordering in JavaScript** on a list endpoint: key fields such as ids compared with `<`, `>`, `localeCompare` or a sort, instead of being left to the database. A filter after the fetch must match by equality. Rule: `services/api/README.md` § Pagination.
 3. **Missing tests.**
    - New or changed behaviour in the Contract with no `*.test.ts` covering it.
    - Verification items with no test or evidence.
@@ -50,7 +51,7 @@ Return only this. Put blocking findings first, then non-blocking, and keep the c
 Verdict: BLOCKED | OK
 Blocking: <count>  Non-blocking: <count>
 
-- [blocking] <path>:<line> (<check: scope | invariant | tests | style>) <what is wrong>. Rule: <Touchable files | Out of scope | CLAUDE.md "<quote>" | issue Invariant "<quote>">.
+- [blocking] <path>:<line> (<check: scope | invariant | tests | style>) <what is wrong>. Rule: <Touchable files | Out of scope | CLAUDE.md "<quote>" | issue Invariant "<quote>" | <doc path> § <section>>.
 - [non-blocking] <path>:<line> (<check>) <what is wrong>. Suggestion: <one line>.
 ```
 
