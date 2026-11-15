@@ -62,6 +62,26 @@ const VALID: Readonly<Record<string, string>> = {
   limit: "50",
 };
 
+const cursorOf = (key: Readonly<Record<string, string>>): string =>
+  Buffer.from(JSON.stringify(key), "utf8").toString("base64url");
+
+/** Samples that depend on the route: a cursor decodes to that endpoint's own sort key. */
+const VALID_BY_ROUTE: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  "/ledger": { cursor: cursorOf({ createdAt: "2026-01-01T12:00:00.000Z", id: "entry" }) },
+  "/trades": {
+    cursor: cursorOf({ filledAt: "2026-01-01T12:00:00.000Z", fillId: "fill", side: "BUY" }),
+  },
+};
+
+/** A value the parameter accepts. Every parameter needs one, so its "given twice" case exists. */
+const validSample = (route: string, name: string): string => {
+  const value = VALID_BY_ROUTE[route]?.[name] ?? VALID[name];
+  if (value === undefined) {
+    throw new Error(`Add a valid sample for ${route} parameter "${name}"`);
+  }
+  return value;
+};
+
 /**
  * Refused values for parameters whose documented schema is a bare string, so it names nothing to
  * refuse. A cursor is refused when it is not base64url, or is base64url of JSON that is no sort key.
@@ -86,7 +106,7 @@ const invalidValues = (route: string, parameter: Parameter): readonly string[] =
   }
   if (schema.pattern !== undefined) {
     const pattern = new RegExp(schema.pattern, "u");
-    return ["not valid!", "", `${VALID[name] ?? "X"}X`.toLowerCase()].filter(
+    return ["not valid!", "", `${validSample(route, name)}X`.toLowerCase()].filter(
       (value) => !pattern.test(value),
     );
   }
@@ -119,22 +139,16 @@ const casesFor = (method: Method, route: string, parameters: readonly Parameter[
     return [];
   }
 
-  // Every parameter with a sample, not only the required ones: a bad value must be refused next to
-  // valid neighbours, because cross-field checks (from < to) only run when the neighbour is there.
-  const base = query.flatMap((parameter): [string, string][] => {
-    const value = VALID[parameter.name];
-    if (value === undefined && parameter.required === true) {
-      throw new Error(`Add a valid sample for required ${route} parameter "${parameter.name}"`);
-    }
-    return value === undefined ? [] : [[parameter.name, value]];
-  });
+  // Every parameter, not only the required ones: a bad value must be refused next to valid
+  // neighbours, because cross-field checks (from < to) only run when the neighbour is there.
+  const base = query.map(({ name }): [string, string] => [name, validSample(route, name)]);
   const withValue = (name: string, pairs: readonly [string, string][]): string =>
     new URLSearchParams([...base.filter(([key]) => key !== name), ...pairs]).toString();
 
   const cases = query.flatMap((parameter): Case[] => {
     const { name } = parameter;
     const expectedPath = `query.${name}`;
-    const sample = VALID[name];
+    const sample = validSample(route, name);
     return [
       ...invalidValues(route, parameter).map((value) => ({
         method,
@@ -144,20 +158,16 @@ const casesFor = (method: Method, route: string, parameters: readonly Parameter[
         expectedPath,
       })),
       // Twice a valid value, so the repetition alone is what is refused.
-      ...(sample === undefined
-        ? []
-        : [
-            {
-              method,
-              route,
-              label: `${name} given twice`,
-              query: withValue(name, [
-                [name, sample],
-                [name, sample],
-              ]),
-              expectedPath,
-            },
-          ]),
+      {
+        method,
+        route,
+        label: `${name} given twice`,
+        query: withValue(name, [
+          [name, sample],
+          [name, sample],
+        ]),
+        expectedPath,
+      },
     ];
   });
 

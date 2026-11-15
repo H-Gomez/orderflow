@@ -9,6 +9,8 @@ metadata:
     url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
 ---
 
+In this repo the template sits inside the shape `docs/conventions/agent-comments.md` sets for a PR body. The first line is `Closes #<issue>` for the story. The status word, action line and bullets come next. The sections below go inside `<details><summary>Full notes</summary>`. Before posting, check everything below the `Closes` line with `pnpm --silent lint:comment`.
+
 Use this template for writing the PR body:
 
 ```markdown
